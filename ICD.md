@@ -22,11 +22,13 @@ flowchart LR
         EP1["Endpoint 1 IN (Interrupt, 1000Hz)"]
         EP2["Endpoint 2 OUT (Interrupt, 16 bytes)"]
         FSM["Autonomous Animation Engine"]
+        KEY["Key Engine & EEPROM"]
         WS2812["3x NeoPixels (WS2812B)"]
     end
     EP1 -->|"Report ID 1: Keyboard<br>Report ID 2: Consumer"| Host
-    Host -->|"Report ID 3: Vendor LED Control"| EP2
-    EP2 --> FSM
+    Host -->|"Report ID 3: Vendor LED Control<br>Report ID 4: Vendor Keymap Config"| EP2
+    EP2 -->|"Report ID 3"| FSM
+    EP2 -->|"Report ID 4"| KEY
     FSM --> WS2812
 ```
 
@@ -35,7 +37,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **EP0** | Bidirectional | Control | 64 bytes | - | Standard enumeration and descriptors. |
 | **EP1** | IN (Device -> Host) | Interrupt | 16 bytes | 1 ms (1000 Hz) | Key press reports and consumer / multimedia controls. |
-| **EP2** | OUT (Host -> Device) | Interrupt | 16 bytes | 1 ms | Host RGB lighting commands. |
+| **EP2** | OUT (Host -> Device) | Interrupt | 16 bytes | 1 ms | Host RGB lighting and runtime key remapping commands. |
 
 ---
 
@@ -123,9 +125,77 @@ Upon receiving a packet for one or all LEDs, the microcontroller executes the fo
 
 ---
 
-## 4. Linux Host Setup
+## 4. Runtime Keymap Configuration Protocol (Host -> MacroPad)
 
-### 4.1. udev Rule (Non-root user access)
+The host can reconfigure key actions, toggle behaviors, consumer multimedia usages, and macro sequences on-the-fly without entering bootloader mode by sending an output report (**Report ID 0x04**) via `/dev/hidrawX` (Linux) or Endpoint 2 OUT.
+
+### 4.1. Command Packet Structure (16 bytes)
+
+```text
+Byte 0:      REPORT_ID   -> 0x04
+Byte 1:      SLOT_INDEX  -> Slot to configure (0..5)
+Byte 2..13:  PAYLOAD     -> 12-byte key definition (matches EEPROM layout)
+Byte 14:     0x00        -> Reserved padding (0x00)
+Byte 15:     FLAGS       -> Control flags (Commit to EEPROM, Reset states)
+```
+
+### 4.2. Slot Index Table (`SLOT_INDEX`)
+| Index | Physical Control | Default Action |
+| :---: | :--- | :--- |
+| `0x00` | **Key 1** (Left switch) | Keyboard: `Ctrl + C` (Copy) |
+| `0x01` | **Key 2** (Center switch) | Keyboard: `Ctrl + V` (Paste) |
+| `0x02` | **Key 3** (Right switch) | Keyboard: `Ctrl + Z` (Undo) |
+| `0x03` | **Knob Switch** (Push button) | Consumer: `Mute` (`0x00E2`) |
+| `0x04` | **Knob CW** (Clockwise rotation) | Consumer: `Volume Up` (`0x00E9`) |
+| `0x05` | **Knob CCW** (Counter-clockwise rotation) | Consumer: `Volume Down` (`0x00EA`) |
+
+### 4.3. Key Payload Structures (12 bytes, Bytes 2..13)
+
+#### Mode 0: Keyboard (`KEY_TYPE = 0x00`)
+```text
+Byte 2:      0x00        -> KEYBOARD type
+Byte 3:      MOD_0       -> Modifiers bitmask for state 0 (Ctrl, Shift, Alt, GUI)
+Byte 4:      KEY_0       -> HID keycode for state 0
+Byte 5:      MOD_1       -> Modifiers bitmask for state 1 (Toggle mode)
+Byte 6:      KEY_1       -> HID keycode for state 1
+Byte 7..13:  0x00        -> Reserved padding (0x00)
+```
+*Note: If `KEY_1 == 0x00`, the firmware automatically duplicates `KEY_0` and `MOD_0` so the key fires the same action on every press.*
+
+#### Mode 1: Consumer / Multimedia (`KEY_TYPE = 0x01`)
+```text
+Byte 2:      0x01        -> CONSUMER type
+Byte 3:      USAGE_0_L   -> 16-bit Consumer usage code 0 low byte (LSB)
+Byte 4:      USAGE_0_H   -> 16-bit Consumer usage code 0 high byte (MSB)
+Byte 5:      USAGE_1_L   -> 16-bit Consumer usage code 1 low byte (LSB, Toggle mode)
+Byte 6:      USAGE_1_H   -> 16-bit Consumer usage code 1 high byte (MSB, Toggle mode)
+Byte 7..13:  0x00        -> Reserved padding (0x00)
+```
+
+#### Mode 2: Macro (`KEY_TYPE = 0x02`)
+```text
+Byte 2:      0x02        -> MACRO type
+Byte 3:      COUNT       -> Number of sequential keystrokes (1..10)
+Byte 4..13:  KEY_0..9    -> Up to 10 sequential HID keycodes (emitted with 5ms delays)
+```
+
+### 4.4. Control Flags (`FLAGS`, Byte 15)
+| Bit | Name | Value | Description |
+| :---: | :--- | :---: | :--- |
+| **0** | `COMMIT_EEPROM` | `0x01` | **1:** Write the 12-byte payload to CH552 Data Flash (`addr = slot * 12`) **and** update RAM immediately (persistent across reboots).<br>**0:** Update RAM mapping only (temporary test mode; avoids flash wear). |
+| **1** | `RESET_STATE` | `0x02` | **1:** Reset switch debounce, toggle, and physical state (`debounce = 0, last = 0, toggle = 0`). Recommended during remapping. |
+
+### 4.5. Microcontroller Execution Sequence
+1. **Flow Control NAK:** When Endpoint 2 OUT receives Report ID 4, it buffers the 16 bytes in XRAM and sets EP2 to NAK so subsequent packets are held off by USB hardware until processing finishes.
+2. **Flash Programming:** If `FLAGS & 0x01`, interrupts are briefly inhibited (`EA = 0`), Safe Mode is engaged (`SAFE_MOD = 0x55, 0xAA; GLOBAL_CFG |= bDATA_WE;`), and the 12 bytes are written to Data Flash byte-by-byte.
+3. **RAM Activation:** The active `struct key keys[slot]` in RAM is updated immediately with the new type, modifiers, keycodes, and consumer usages.
+4. **Resumption:** Interrupts and Endpoint 2 OUT ACK are restored. The key operates with its new mapping on the next scan cycle.
+
+---
+
+## 5. Linux Host Setup
+
+### 5.1. udev Rule (Non-root user access)
 Install the provided udev rule from `tools/udev/99-macropad.rules`:
 ```bash
 sudo cp tools/udev/99-macropad.rules /etc/udev/rules.d/
@@ -140,7 +210,7 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="1189", ATTRS{idProduct}=="8890", MODE="0666
 SUBSYSTEM=="usb", ATTRS{idVendor}=="4348", ATTRS{idProduct}=="55e0", MODE="0666", TAG+="uaccess"
 ```
 
-### 4.2. Host Device Discovery
+### 5.2. Host Device Discovery
 The host can locate the active `/dev/hidrawX` node by searching for the device ID in `/sys/class/hidraw/hidraw*/device/uevent`:
 ```text
 HID_ID=0003:00001189:00008890
@@ -148,9 +218,9 @@ HID_ID=0003:00001189:00008890
 
 ---
 
-## 5. Developer Implementation Examples
+## 6. Developer Implementation Examples
 
-### 5.1. Python (Zero External Dependencies)
+### 6.1. Python (Zero External Dependencies)
 ```python
 import os, glob, re
 

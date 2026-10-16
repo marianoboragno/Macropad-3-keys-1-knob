@@ -96,6 +96,32 @@ uint8_t eeprom_read_byte(uint8_t addr)
   return ROM_DATA_L;
 }
 
+// Write a single byte to CH552 Data Flash (EEPROM emulation)
+// Address space starts at DATA_FLASH_ADDR (0xC000)
+uint8_t eeprom_write_byte(uint8_t addr, uint8_t dat)
+{
+  if (addr > 0x7F) return 0xFF; // Data Flash limit: 128 bytes (0x00 to 0x7F)
+
+  EA = 0;                       // Inhibit interrupts for safe mode & flash programming
+  SAFE_MOD = 0x55;
+  SAFE_MOD = 0xAA;              // Enter safe mode
+  GLOBAL_CFG |= bDATA_WE;       // Enable Data Flash writing
+  SAFE_MOD = 0x00;              // Exit safe mode
+
+  ROM_ADDR_H = DATA_FLASH_ADDR >> 8;
+  ROM_ADDR_L = addr << 1;       // 16-bit word alignment
+  ROM_DATA_L = dat;
+  ROM_CTRL = ROM_CMD_WRITE;     // Execute write (CPU pauses until complete)
+
+  SAFE_MOD = 0x55;
+  SAFE_MOD = 0xAA;              // Enter safe mode
+  GLOBAL_CFG &= ~bDATA_WE;      // Disable Data Flash writing (write protect)
+  SAFE_MOD = 0x00;              // Exit safe mode
+  EA = 1;                       // Re-enable interrupts
+
+  return (ROM_STATUS & bROM_CMD_ERR) ? 0xFE : 0;
+}
+
 // handle key press
 void handle_key(uint8_t current, struct key *key, struct led_channel *led)
 {
@@ -474,6 +500,105 @@ void load_default_key(struct key *k, uint8_t idx)
   }
 }
 
+// Load key mapping from a 12-byte buffer into a key struct
+void load_key_from_buffer(struct key *k, uint8_t idx, __xdata uint8_t *buf)
+{
+  uint8_t j;
+  uint8_t ktype = buf[0];
+  if (ktype == KEYBOARD)
+  {
+    k->type = KEYBOARD;
+    k->mod[0] = buf[1];
+    k->code[0] = buf[2];
+    k->mod[1] = buf[3];
+    k->code[1] = buf[4];
+    // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
+    if (k->code[1] == 0)
+    {
+      k->code[1] = k->code[0];
+      k->mod[1] = k->mod[0];
+    }
+  }
+  else if (ktype == CONSUMER)
+  {
+    k->type = CONSUMER;
+    // Read 16-bit consumer codes (LSB | MSB << 8)
+    k->codeConsumer[0] = (uint16_t)buf[1] | ((uint16_t)buf[2] << 8);
+    k->codeConsumer[1] = (uint16_t)buf[3] | ((uint16_t)buf[4] << 8);
+    // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
+    if (k->codeConsumer[1] == 0)
+    {
+      k->codeConsumer[1] = k->codeConsumer[0];
+    }
+  }
+  else if (ktype == MACRO)
+  {
+    k->type = MACRO;
+    k->ammount = buf[1];
+    // Prevent XRAM buffer overflow if ammount > 10 (Bug 1 fix)
+    if (k->ammount > 10)
+      k->ammount = 10;
+    for (j = 0; j < k->ammount; j++)
+    {
+      k->code[j] = buf[2 + j];
+    }
+  }
+  else
+  {
+    // Fallback to built-in factory defaults if unprogrammed (0xFF) or invalid
+    load_default_key(k, idx);
+  }
+}
+
+// Read 12 bytes from Data Flash (EEPROM) and populate key struct
+void load_key_from_eeprom(struct key *k, uint8_t idx)
+{
+  __xdata uint8_t raw[12];
+  uint8_t addr = idx * 12;
+  uint8_t j;
+  for (j = 0; j < 12; j++)
+  {
+    raw[j] = eeprom_read_byte(addr + j);
+  }
+  k->debounce = 0;
+  k->last = 0;
+  k->toggle = 0;
+  load_key_from_buffer(k, idx, raw);
+}
+
+// Process incoming host command for Key configuration (Report ID 0x04)
+void process_key_command(__xdata struct key *keys, __xdata uint8_t *buf)
+{
+  uint8_t slot = buf[1];
+  uint8_t flags = buf[15];
+  uint8_t j;
+  uint8_t addr;
+
+  if (slot >= 6) return; // Invalid slot index
+
+  // Bit 0: COMMIT_EEPROM (1 = Write 12 bytes to Data Flash)
+  if (flags & 0x01)
+  {
+    addr = slot * 12;
+    for (j = 0; j < 12; j++)
+    {
+      eeprom_write_byte(addr + j, buf[2 + j]);
+    }
+  }
+
+  // Update RAM mapping immediately
+  load_key_from_buffer(&keys[slot], slot, &buf[2]);
+
+  // Bit 1: RESET_STATE (Reset debounce, toggle, and last state)
+  // Also reset on standard EEPROM commit for clean state transition
+  if ((flags & 0x02) || (flags & 0x01))
+  {
+    keys[slot].debounce = 0;
+    keys[slot].last = 0;
+    keys[slot].toggle = 0;
+  }
+}
+
 // ===================================================================================
 // Main Function
 // ===================================================================================
@@ -482,7 +607,6 @@ void main(void)
   // Variables
   __xdata struct key keys[6]; // array of struct for keys
   __idata uint8_t i;
-  __idata uint8_t j; // temp variable
   uint8_t enc_state = R_START;
   uint8_t pin_state;
   uint8_t anim_div = 0;
@@ -504,59 +628,9 @@ void main(void)
   WDT_start();  // start watchdog timer
 
   // Read EEPROM configurations for all 6 keys (12 bytes per key)
-  uint8_t eeprom_addr = 0;
   for (i = 0; i < 6; i++)
   {
-    keys[i].debounce = 0;
-    keys[i].last = 0;
-    keys[i].toggle = 0;
-    uint8_t ktype = eeprom_read_byte(eeprom_addr);
-    if (ktype == KEYBOARD)
-    {
-      keys[i].type = KEYBOARD;
-      keys[i].mod[0] = eeprom_read_byte(eeprom_addr + 1);
-      keys[i].code[0] = eeprom_read_byte(eeprom_addr + 2);
-      keys[i].mod[1] = eeprom_read_byte(eeprom_addr + 3);
-      keys[i].code[1] = eeprom_read_byte(eeprom_addr + 4);
-      // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
-      if (keys[i].code[1] == 0)
-      {
-        keys[i].code[1] = keys[i].code[0];
-        keys[i].mod[1] = keys[i].mod[0];
-      }
-    }
-    else if (ktype == CONSUMER)
-    {
-      keys[i].type = CONSUMER;
-      // Read 16-bit consumer codes (LSB | MSB << 8)
-      keys[i].codeConsumer[0] = (uint16_t)eeprom_read_byte(eeprom_addr + 1) |
-                                ((uint16_t)eeprom_read_byte(eeprom_addr + 2) << 8);
-      keys[i].codeConsumer[1] = (uint16_t)eeprom_read_byte(eeprom_addr + 3) |
-                                ((uint16_t)eeprom_read_byte(eeprom_addr + 4) << 8);
-      // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
-      if (keys[i].codeConsumer[1] == 0)
-      {
-        keys[i].codeConsumer[1] = keys[i].codeConsumer[0];
-      }
-    }
-    else if (ktype == MACRO)
-    {
-      keys[i].type = MACRO;
-      keys[i].ammount = eeprom_read_byte(eeprom_addr + 1);
-      // Prevent XRAM buffer overflow if EEPROM has invalid ammount (Bug 1 fix)
-      if (keys[i].ammount > 10)
-        keys[i].ammount = 10;
-      for (j = 0; j < keys[i].ammount; j++)
-      {
-        keys[i].code[j] = eeprom_read_byte(eeprom_addr + 2 + j);
-      }
-    }
-    else
-    {
-      // Fallback to built-in factory defaults if EEPROM is unprogrammed (0xFF) or invalid
-      load_default_key(&keys[i], i);
-    }
-    eeprom_addr += 12;
+    load_key_from_eeprom(&keys[i], i);
   }
 
   // Initialize LED defaults: OFF
@@ -595,11 +669,18 @@ void main(void)
       handle_knob(&keys[5]); // counter-clockwise
     }
 
-    // Process pending host USB command
-    if (led_cmd_pending)
+    // Process pending host USB command (Report 3: LEDs, Report 4: Keys)
+    if (host_cmd_pending)
     {
-      process_led_command(led_cmd_buf);
-      led_cmd_pending = 0;
+      if (host_cmd_buf[0] == 3)
+      {
+        process_led_command(host_cmd_buf);
+      }
+      else if (host_cmd_buf[0] == 4)
+      {
+        process_key_command(keys, host_cmd_buf);
+      }
+      host_cmd_pending = 0;
       // Re-enable EP2 OUT reception (ACK)
       UEP2_CTRL = (UEP2_CTRL & ~MASK_UEP_R_RES) | UEP_R_RES_ACK;
     }

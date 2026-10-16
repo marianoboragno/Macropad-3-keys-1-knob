@@ -11,5 +11,9 @@
 void HID_init(void);                                      // setup USB-HID
 void HID_sendReport(__xdata uint8_t* buf, uint8_t len);   // send HID report
 
-extern volatile __bit led_cmd_pending;
-extern __xdata uint8_t led_cmd_buf[16];
+extern volatile __bit host_cmd_pending;
+extern __xdata uint8_t host_cmd_buf[16];
+
+// Backwards-compatibility aliases
+#define led_cmd_pending host_cmd_pending
+#define led_cmd_buf     host_cmd_buf

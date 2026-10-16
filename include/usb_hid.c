@@ -69,17 +69,17 @@ void HID_EP1_IN(void) {
   HID_EP1_writeBusyFlag = 0;                                // clear busy flag
 }
 
-volatile __bit led_cmd_pending = 0;
-__xdata uint8_t led_cmd_buf[16];
+volatile __bit host_cmd_pending = 0;
+__xdata uint8_t host_cmd_buf[16];
 
 // Endpoint 2 OUT handler (HID report transfer from host)
 void HID_EP2_OUT(void) {                                    // auto response
   uint8_t i;
-  if (EP2_buffer[0] == 3) {                                 // Vendor Report ID 3 (LED command)
+  if (EP2_buffer[0] == 3 || EP2_buffer[0] == 4) {           // Vendor Report ID 3 (LED) or 4 (Keymap)
     for (i = 0; i < 16; i++) {
-      led_cmd_buf[i] = EP2_buffer[i];
+      host_cmd_buf[i] = EP2_buffer[i];
     }
-    led_cmd_pending = 1;
+    host_cmd_pending = 1;
     // Set OUT endpoint to return NAK to host until main loop finishes processing this command
     UEP2_CTRL = (UEP2_CTRL & ~MASK_UEP_R_RES) | UEP_R_RES_NAK;
   }

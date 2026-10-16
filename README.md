@@ -21,16 +21,16 @@ The MacroPad operates as a composite USB HID input device, acting simultaneously
 flowchart TD
     subgraph Hardware ["MacroPad Mini"]
         MCU["MCU WCH CH552G<br>(8051 @ 16MHz, USB Full-Speed)"]
-        SW1["Key 1 (Cherry MX)"] -->|P1.1| MCU
-        SW2["Key 2 (Cherry MX)"] -->|P1.7| MCU
-        SW3["Key 3 (Cherry MX)"] -->|P1.6| MCU
-        ENC_SW["Knob Switch"] -->|P3.3| MCU
-        ENC_A["Encoder Out A"] -->|P3.1| MCU
-        ENC_B["Encoder Out B"] -->|P3.0| MCU
-        MCU -->|P3.4| NEO["3x WS2812B LEDs<br>(Daisy-Chain)"]
+        SW1["Key 1 (Cherry MX)"] -->|"P1.1 / pin 9"| MCU
+        SW2["Key 2 (Cherry MX)"] -->|"P1.7 / pin 5"| MCU
+        SW3["Key 3 (Cherry MX)"] -->|"P1.6 / pin 4"| MCU
+        ENC_SW["Knob Switch"] -->|"P3.3 / pin 10"| MCU
+        ENC_A["Encoder Out A"] -->|"P3.1 / pin 7"| MCU
+        ENC_B["Encoder Out B"] -->|"P3.0 / pin 8"| MCU
+        MCU -->|"P3.4 / pin 11"| NEO["3x WS2812B LEDs<br>(Daisy-Chain)"]
         
         USB["USB Type-C Connector"]
-        MCU --- |"D+ (P3.6) / D- (P3.7)"| USB
+        MCU --- |"D+ (P3.6 / pin 12) / D- (P3.7 / pin 13)"| USB
     end
     
     USB --- Host["Host PC (Linux / Win / Mac)"]
@@ -52,21 +52,48 @@ flowchart TD
      - Zero reverse/glitch events when spun quickly.
 4. **RGB Illumination:**
    - 3 addressable WS2812B LEDs (NeoPixels) placed under each switch.
-   - Single-wire high-speed serial bus on pin `P3.4` (800 kHz).
+   - Single-wire high-speed serial bus on port `P3.4` (physical pin 11, 800 kHz).
    - Autonomous animation engine supporting 5 modes: `OFF`, `SOLID`, `BREATHE`, `BLINK`, and `REACTIVE`.
 
-### Pinout Mapping (CH552G)
-| Function | MCU Pin | GPIO Mode | Description |
-| :--- | :---: | :--- | :--- |
-| **PIN_KEY1** | `P1.1` | Input with pull-up | Key 1 (left switch) |
-| **PIN_KEY2** | `P1.7` | Input with pull-up | Key 2 (center switch) |
-| **PIN_KEY3** | `P1.6` | Input with pull-up | Key 3 (right switch) |
-| **PIN_ENC_SW** | `P3.3` | Input with pull-up | Knob integrated push switch |
-| **PIN_ENC_A** | `P3.1` | Input with pull-up | Rotary encoder quadrature channel A |
-| **PIN_ENC_B** | `P3.0` | Input with pull-up | Rotary encoder quadrature channel B |
-| **PIN_NEO** | `P3.4` | Push-Pull Output | WS2812B data line (via 330Ω resistor) |
-| **USB D+ / BOOT** | `P3.6` | USB D+ / Input | USB D+ data line (forced pull-up triggers Bootloader) |
-| **USB D-** | `P3.7` | USB D- | USB D- data line |
+### 1.1. MacroPad Pinout Mapping
+| Function | MCU Port | Package Pin (SOP-16) | GPIO Mode | Description |
+| :--- | :---: | :---: | :--- | :--- |
+| **PIN_KEY1** | `P1.1` | Pin 9 | Input with pull-up | Key 1 (left switch / software bootloader key) |
+| **PIN_KEY2** | `P1.7` | Pin 5 | Input with pull-up | Key 2 (center switch) |
+| **PIN_KEY3** | `P1.6` | Pin 4 | Input with pull-up | Key 3 (right switch) |
+| **PIN_ENC_SW** | `P3.3` | Pin 10 | Input with pull-up | Knob integrated tactile push button |
+| **PIN_ENC_A** | `P3.1` | Pin 7 | Input with pull-up | Rotary encoder quadrature channel A |
+| **PIN_ENC_B** | `P3.0` | Pin 8 | Input with pull-up | Rotary encoder quadrature channel B |
+| **PIN_NEO** | `P3.4` | Pin 11 | Push-Pull Output | WS2812B NeoPixel data line (via 330Ω series resistor) |
+| **USB D+ / BOOT** | `P3.6` | Pin 12 | USB D+ / Input | USB Data+ line (hardware 1 kΩ pull-up to 5V triggers Bootloader) |
+| **USB D-** | `P3.7` | Pin 13 | USB D- | USB Data- line |
+| **VCC** | `VCC` | Pin 15 | Power Input | USB VBUS (+5V) |
+| **GND** | `GND` | Pin 14 | Ground | System Ground (0V) |
+| **V33** | `V33` | Pin 16 | Power Output | Internal 3.3V LDO output (0.1 µF decoupling capacitor to GND) |
+| **RST** | `RST` | Pin 6 | Reset Input | External reset (unused on board, internal pull-down active) |
+
+### 1.2. WCH CH552G Complete MCU Hardware Reference (SOP-16)
+Official technical documentation and electrical specifications:
+👉 **[Official WCH CH552 Datasheet (CH552DS1.PDF)](https://www.wch-ic.com/downloads/CH552DS1_PDF.html)**
+
+| Pin # | Primary Port | Alternate Functions / Peripherals | MacroPad Connection |
+| :---: | :--- | :--- | :--- |
+| **1** | `P3.2` | TXD1, INT0, VBUS1, AIN3 | Unused / Test pad |
+| **2** | `P1.4` | T2, CAP1, SCS, TIN2, UCC1, AIN1 | Unused |
+| **3** | `P1.5` | MOSI, PWM1, TIN3, UCC2, AIN2 | Unused |
+| **4** | `P1.6` | MISO, RXD1, TIN4 | **Key 3** (Right switch) |
+| **5** | `P1.7` | SCK, TXD1, TIN5 | **Key 2** (Center switch) |
+| **6** | `RST` | T2EX, CAP2 | External Reset (Unused / internal pull-down) |
+| **7** | `P3.1` | PWM2, TXD | **Rotary Knob Output A** |
+| **8** | `P3.0` | PWM1, RXD | **Rotary Knob Output B** |
+| **9** | `P1.1` | T2EX, CAP2, TIN1, VBUS2, AIN0 | **Key 1** (Left switch / Software Bootloader trigger) |
+| **10** | `P3.3` | INT1 | **Rotary Knob Switch** (Push button) |
+| **11** | `P3.4` | PWM2, RXD1, T0 | **WS2812B NeoPixel Data Line** |
+| **12** | `P3.6` | UDP (USB D+) | **USB Data Positive (D+)** / Hardware Bootloader pull-up (Method B) |
+| **13** | `P3.7` | UDM (USB D-) | **USB Data Negative (D-)** |
+| **14** | `GND` | Ground / VSS | **System Ground (GND)** |
+| **15** | `VCC` | Power Supply / VDD (3.3V to 5V) | **USB VBUS (+5V)** |
+| **16** | `V33` | Internal 3.3V LDO Output | **0.1 µF Decoupling Capacitor to GND** |
 
 ---
 
@@ -95,8 +122,8 @@ The CH552 includes a factory ROM bootloader that enables flashing firmware direc
 ### Method B: Hardware Pull-up (MANDATORY for First Flash / Recovery)
 This method forces the microcontroller's unalterable internal factory ROM into bootloader mode at power-on:
 1. **Unscrew the bottom plate** of the macropad to access the underside of the PCB.
-2. The WCH bootloader checks at power-on whether line `D+` (`P3.6`) is pulled high.
-3. With the board disconnected from USB, temporarily hold a **1 kΩ resistor between pin P3.6 (D+) and 5V (VBUS / VCC)** (or across the boot pads on boards equipped with them).
+2. The WCH bootloader checks at power-on whether line `D+` (`P3.6 / pin 12`) is pulled high.
+3. With the board disconnected from USB, temporarily hold a **1 kΩ resistor between pin P3.6 (D+, physical pin 12) and 5V (VBUS / VCC, physical pin 15)** (or across the boot pads on boards equipped with them).
 4. Plug in the USB cable to your computer.
 5. Within the 3-second countdown provided by the flasher, remove the resistor.
 6. Verify detection with `lsusb`:
@@ -333,7 +360,28 @@ The compiler (`tools/keymap.py`) validates all names, modifiers, and keycodes **
   `ValueError: Unknown keycode: unknown_key`
 * The flashing process is aborted immediately without writing corrupt or invalid bytes to the device EEPROM.
 
-### 4.4. Flashing and EEPROM Tools
+### 4.4. Runtime Live Keymap Configuration (`macropad_config.py`)
+The firmware supports real-time key remapping over USB HID (**Report ID 0x04**) without rebooting the microcontroller into bootloader mode. The host script [`tools/macropad_config.py`](tools/macropad_config.py) applies configurations directly via `/dev/hidrawX`, storing changes permanently into Data Flash (EEPROM) and updating RAM immediately:
+
+```bash
+# Apply a full keymap from a JSON file:
+python tools/macropad_config.py keymap.json
+
+# Remap Key 1 to Ctrl+C permanently:
+python tools/macropad_config.py --slot key1 --key c --mod ctrl
+
+# Remap Key 2 to Alt+Tab temporarily (RAM-only test mode; prevents flash wear):
+python tools/macropad_config.py --slot key2 --key tab --mod alt --temp
+
+# Remap Knob Push Button to Play/Pause:
+python tools/macropad_config.py --slot knob_sw --action play_pause
+
+# Remap Key 3 to type a macro keystroke sequence:
+python tools/macropad_config.py --slot key3 --macro h,e,l,l,o,enter
+```
+
+### 4.5. Flashing and EEPROM Tools
+When flashing the full microcontroller or performing offline EEPROM programming via Bootloader mode:
 The unified flasher [`tools/flash.py`](tools/flash.py) manages both firmware and EEPROM configuration:
 
 - **Flash firmware AND keymap (default):**
@@ -355,7 +403,7 @@ The unified flasher [`tools/flash.py`](tools/flash.py) manages both firmware and
   python tools/dump_eeprom.py eeprom_backup.bin
   ```
 
-### 4.5. Live Input Diagnostics (`test_macropad.py`)
+### 4.6. Live Input Diagnostics (`test_macropad.py`)
 To monitor physical keystrokes, rotary encoder steps, and knob button clicks in real time:
 ```bash
 sudo $(which python) tools/test_macropad.py
@@ -412,6 +460,10 @@ See the [LICENSE](LICENSE) file for the full license text. Note that `tools/chpr
 - **Full-Step FSM Rotary Encoder Debouncing:** Implemented Ben Buxton's state machine to eliminate double-stepping, missed detents, and erratic reverse triggers.
 - **Switch Lockout Debounce:** Added 15 ms non-blocking lockout filter to eliminate mechanical contact chatter.
 - **Autonomous RGB LED Subsystem:** Implemented on-chip animation engine for WS2812B LEDs with 5 modes (Solid, Breathe, Blink, Reactive, Off) running independently from the host.
-- **USB HID Output Protocol (Report ID 3):** Added Endpoint 2 OUT with a vendor-defined collection (`0xFF00`) to control lighting in real-time from any OS without root/admin restrictions.
+- **USB HID Output Protocol (Report ID 3 & 4):** Added Endpoint 2 OUT with a vendor-defined collection (`0xFF00`) to control lighting (Report 3) and reconfigure key bindings (Report 4) in real-time from any OS without root/admin restrictions.
+- **Runtime Live Keymap Configuration:** Live on-the-fly key remapping over USB HID (`tools/macropad_config.py`) writing to CH552 Data Flash (EEPROM) and updating active RAM instantly without rebooting into bootloader mode.
 - **Anti-Flash & Phase Synchronization:** Added atomic blackout, parameter latching, and phase reset sequence to synchronize all LEDs smoothly.
-- **Documentation & Tooling:** Complete Interface Control Document (ICD), automated flasher, Python CLI utility, and Linux udev rules.
+- **Documentation & Tooling:** Complete Interface Control Document (ICD), automated flasher, runtime key configurator, Python CLI utilities, and Linux udev rules.
+
+### Project Backlog & Future Work
+Planned improvements, pending firmware hardening items, and technical investigations are tracked in **[`TODO.md`](TODO.md)**.
