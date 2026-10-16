@@ -80,5 +80,7 @@ void HID_EP2_OUT(void) {                                    // auto response
       led_cmd_buf[i] = EP2_buffer[i];
     }
     led_cmd_pending = 1;
+    // Set OUT endpoint to return NAK to host until main loop finishes processing this command
+    UEP2_CTRL = (UEP2_CTRL & ~MASK_UEP_R_RES) | UEP_R_RES_NAK;
   }
 }

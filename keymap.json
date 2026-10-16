@@ -1,0 +1,35 @@
+{
+  "key1": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "c",
+    "comment": "Key 1 (left): Ctrl + C (Copy)"
+  },
+  "key2": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "v",
+    "comment": "Key 2 (center): Ctrl + V (Paste)"
+  },
+  "key3": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "z",
+    "comment": "Key 3 (right): Ctrl + Z (Undo)"
+  },
+  "knob_switch": {
+    "type": "consumer",
+    "action": "mute",
+    "comment": "Knob switch: Consumer Mute"
+  },
+  "knob_cw": {
+    "type": "consumer",
+    "action": "volume_up",
+    "comment": "Knob clockwise: Volume Up"
+  },
+  "knob_ccw": {
+    "type": "consumer",
+    "action": "volume_down",
+    "comment": "Knob counter-clockwise: Volume Down"
+  }
+}

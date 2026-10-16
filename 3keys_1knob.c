@@ -276,6 +276,11 @@ void handle_knob(struct key *key)
 // LED Autonomous Animation Engine & Command Processing
 // ===================================================================================
 
+// Cache of physically transmitted NeoPixel RGB values to avoid redundant 90us bus stalls
+static __xdata uint8_t rendered_r[3] = {0, 0, 0};
+static __xdata uint8_t rendered_g[3] = {0, 0, 0};
+static __xdata uint8_t rendered_b[3] = {0, 0, 0};
+
 // Process incoming host command for LEDs
 void process_led_command(__xdata uint8_t *buf)
 {
@@ -307,9 +312,15 @@ void process_led_command(__xdata uint8_t *buf)
     leds[i].cur_g = 0;
     leds[i].cur_b = 0;
   }
-  NEO_update_all(leds[0].cur_r, leds[0].cur_g, leds[0].cur_b,
-                 leds[1].cur_r, leds[1].cur_g, leds[1].cur_b,
-                 leds[2].cur_r, leds[2].cur_g, leds[2].cur_b);
+  for (i = 0; i < 3; i++)
+  {
+    rendered_r[i] = leds[i].cur_r;
+    rendered_g[i] = leds[i].cur_g;
+    rendered_b[i] = leds[i].cur_b;
+  }
+  NEO_update_all(rendered_r[0], rendered_g[0], rendered_b[0],
+                 rendered_r[1], rendered_g[1], rendered_b[1],
+                 rendered_r[2], rendered_g[2], rendered_b[2]);
 
   // 2. Configure mode, color, and period while LEDs are off
   for (i = start_i; i < end_i; i++)
@@ -331,6 +342,7 @@ void update_led_animations(uint8_t elapsed_ms)
   uint16_t half_p;
   uint16_t factor;
   uint16_t scale;
+  uint8_t changed = 0;
 
   for (i = 0; i < 3; i++)
   {
@@ -395,11 +407,71 @@ void update_led_animations(uint8_t elapsed_ms)
       if (leds[i].cur_g > 1) leds[i].cur_g -= 2; else leds[i].cur_g = 0;
       if (leds[i].cur_b > 1) leds[i].cur_b -= 2; else leds[i].cur_b = 0;
     }
+
+    if (leds[i].cur_r != rendered_r[i] ||
+        leds[i].cur_g != rendered_g[i] ||
+        leds[i].cur_b != rendered_b[i])
+    {
+      changed = 1;
+      rendered_r[i] = leds[i].cur_r;
+      rendered_g[i] = leds[i].cur_g;
+      rendered_b[i] = leds[i].cur_b;
+    }
   }
 
-  NEO_update_all(leds[0].cur_r, leds[0].cur_g, leds[0].cur_b,
-                 leds[1].cur_r, leds[1].cur_g, leds[1].cur_b,
-                 leds[2].cur_r, leds[2].cur_g, leds[2].cur_b);
+  // Only disable interrupts and write to WS2812B if at least one pixel changed
+  if (changed)
+  {
+    NEO_update_all(rendered_r[0], rendered_g[0], rendered_b[0],
+                   rendered_r[1], rendered_g[1], rendered_b[1],
+                   rendered_r[2], rendered_g[2], rendered_b[2]);
+  }
+}
+
+// ===================================================================================
+// Default Key Configurations (Fallback when EEPROM is unprogrammed / 0xFF)
+// ===================================================================================
+void load_default_key(struct key *k, uint8_t idx)
+{
+  k->last = 0;
+  k->toggle = 0;
+  k->debounce = 0;
+  if (idx == 0) // Key 1: Ctrl + C (Copy)
+  {
+    k->type = KEYBOARD;
+    k->mod[0] = 0x01; k->code[0] = 0x06;
+    k->mod[1] = 0x01; k->code[1] = 0x06;
+  }
+  else if (idx == 1) // Key 2: Ctrl + V (Paste)
+  {
+    k->type = KEYBOARD;
+    k->mod[0] = 0x01; k->code[0] = 0x19;
+    k->mod[1] = 0x01; k->code[1] = 0x19;
+  }
+  else if (idx == 2) // Key 3: Ctrl + Z (Undo)
+  {
+    k->type = KEYBOARD;
+    k->mod[0] = 0x01; k->code[0] = 0x1D;
+    k->mod[1] = 0x01; k->code[1] = 0x1D;
+  }
+  else if (idx == 3) // Knob Switch: Consumer Mute
+  {
+    k->type = CONSUMER;
+    k->codeConsumer[0] = 0x00E2;
+    k->codeConsumer[1] = 0x00E2;
+  }
+  else if (idx == 4) // Knob CW: Consumer Volume Up
+  {
+    k->type = CONSUMER;
+    k->codeConsumer[0] = 0x00E9;
+    k->codeConsumer[1] = 0x00E9;
+  }
+  else if (idx == 5) // Knob CCW: Consumer Volume Down
+  {
+    k->type = CONSUMER;
+    k->codeConsumer[0] = 0x00EA;
+    k->codeConsumer[1] = 0x00EA;
+  }
 }
 
 // ===================================================================================
@@ -436,33 +508,53 @@ void main(void)
   for (i = 0; i < 6; i++)
   {
     keys[i].debounce = 0;
-    if (eeprom_read_byte(eeprom_addr) == 0)
+    keys[i].last = 0;
+    keys[i].toggle = 0;
+    uint8_t ktype = eeprom_read_byte(eeprom_addr);
+    if (ktype == KEYBOARD)
     {
       keys[i].type = KEYBOARD;
       keys[i].mod[0] = eeprom_read_byte(eeprom_addr + 1);
       keys[i].code[0] = eeprom_read_byte(eeprom_addr + 2);
       keys[i].mod[1] = eeprom_read_byte(eeprom_addr + 3);
       keys[i].code[1] = eeprom_read_byte(eeprom_addr + 4);
-      keys[i].last = 0;
-      keys[i].toggle = 0;
+      // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
+      if (keys[i].code[1] == 0)
+      {
+        keys[i].code[1] = keys[i].code[0];
+        keys[i].mod[1] = keys[i].mod[0];
+      }
     }
-    else if (eeprom_read_byte(eeprom_addr) == 1)
+    else if (ktype == CONSUMER)
     {
       keys[i].type = CONSUMER;
-      keys[i].codeConsumer[0] = eeprom_read_byte(eeprom_addr + 1);
-      keys[i].codeConsumer[1] = eeprom_read_byte(eeprom_addr + 2);
-      keys[i].last = 0;
-      keys[i].toggle = 0;
+      // Read 16-bit consumer codes (LSB | MSB << 8)
+      keys[i].codeConsumer[0] = (uint16_t)eeprom_read_byte(eeprom_addr + 1) |
+                                ((uint16_t)eeprom_read_byte(eeprom_addr + 2) << 8);
+      keys[i].codeConsumer[1] = (uint16_t)eeprom_read_byte(eeprom_addr + 3) |
+                                ((uint16_t)eeprom_read_byte(eeprom_addr + 4) << 8);
+      // Fallback: if second state code is 0, duplicate first state (Bug 5 fix)
+      if (keys[i].codeConsumer[1] == 0)
+      {
+        keys[i].codeConsumer[1] = keys[i].codeConsumer[0];
+      }
     }
-    else if (eeprom_read_byte(eeprom_addr) == 2)
+    else if (ktype == MACRO)
     {
       keys[i].type = MACRO;
       keys[i].ammount = eeprom_read_byte(eeprom_addr + 1);
+      // Prevent XRAM buffer overflow if EEPROM has invalid ammount (Bug 1 fix)
+      if (keys[i].ammount > 10)
+        keys[i].ammount = 10;
       for (j = 0; j < keys[i].ammount; j++)
       {
         keys[i].code[j] = eeprom_read_byte(eeprom_addr + 2 + j);
       }
-      keys[i].last = 0;
+    }
+    else
+    {
+      // Fallback to built-in factory defaults if EEPROM is unprogrammed (0xFF) or invalid
+      load_default_key(&keys[i], i);
     }
     eeprom_addr += 12;
   }
@@ -506,8 +598,10 @@ void main(void)
     // Process pending host USB command
     if (led_cmd_pending)
     {
-      led_cmd_pending = 0;
       process_led_command(led_cmd_buf);
+      led_cmd_pending = 0;
+      // Re-enable EP2 OUT reception (ACK)
+      UEP2_CTRL = (UEP2_CTRL & ~MASK_UEP_R_RES) | UEP_R_RES_ACK;
     }
 
     // Update LED animations every 10ms

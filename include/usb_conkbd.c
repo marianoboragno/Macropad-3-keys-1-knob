@@ -1,5 +1,10 @@
 // ===================================================================================
 // USB HID Consumer Keyboard Functions for CH551, CH552 and CH554
+// 2023 by Stefan Wagner (https://github.com/wagiminator)
+// Hardware RE & Knob: biemster (https://github.com/biemster/3keys_1knob)
+// Extended Features:  MrGeorgeK55 (https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob)
+// Modifications (2026): Mariano Boragno (refer to Git history for details)
+// License: GNU General Public License v3.0 (GPLv3)
 // ===================================================================================
 
 #include "usb_conkbd.h"
@@ -18,7 +23,7 @@ __xdata uint8_t  CON_report[9] = {2,0,0,0,0,0,0,0,0};
 // ===================================================================================
 // ASCII to keycode mapping table
 // ===================================================================================
-__code uint8_t KBD_map[128] = {
+__code const uint8_t KBD_map[128] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2a, 0x2b, 0x28, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x2c, 0x9e, 0xb4, 0xa0, 0xa1, 0xa2, 0xa4, 0x34, 0xa6, 0xa7,
@@ -172,17 +177,21 @@ void KBD_code_type(uint8_t mod, uint8_t code) {
 // ===================================================================================
 void CON_press(uint16_t key) {
   uint8_t i;
+  if(!key) return;
+
+  uint8_t k_lo = (uint8_t)(key & 0xFF);
+  uint8_t k_hi = (uint8_t)(key >> 8);
 
   // Check if key is already present in report
   for(i=1; i<9; i+=2) {
-    if((CON_report[i] == key & 0xFF) && (CON_report[i+1] == key >> 8)) return;
+    if((CON_report[i] == k_lo) && (CON_report[i+1] == k_hi)) return;
   }
 
   // Find an empty slot, insert key and transmit report
   for(i=1; i<9; i+=2) {
     if((CON_report[i] == 0) && (CON_report[i+1] == 0)) {  // empty slot?
-      CON_report[i]   = key & 0xFF;             // insert key
-      CON_report[i+1] = key >> 8;
+      CON_report[i]   = k_lo;             // insert key
+      CON_report[i+1] = k_hi;
       CON_sendReport();                         // send report
       return;                                   // and return
     }
@@ -194,10 +203,14 @@ void CON_press(uint16_t key) {
 // ===================================================================================
 void CON_release(uint16_t key) {
   uint8_t i;
+  if(!key) return;
+
+  uint8_t k_lo = (uint8_t)(key & 0xFF);
+  uint8_t k_hi = (uint8_t)(key >> 8);
 
   // Delete key in report
   for(i=1; i<9; i+=2) {
-    if((CON_report[i] == key & 0xFF) && (CON_report[i+1] == key >> 8)) {
+    if((CON_report[i] == k_lo) && (CON_report[i+1] == k_hi)) {
       CON_report[i]   = 0;
       CON_report[i+1] = 0;
     }

@@ -1,8 +1,10 @@
 # ===================================================================================
-# Project:  MacroPad Mini for CH551, CH552, CH554
-# Author:   Stefan Wagner
-# Year:     2023
-# URL:      https://github.com/wagiminator
+# Project:             MacroPad Mini (3 Keys + 1 Rotary Encoder) for CH552G
+# Original Framework:  Stefan Wagner (https://github.com/wagiminator)
+# Hardware RE & Knob:  biemster (https://github.com/biemster/3keys_1knob)
+# Extended Features:   MrGeorgeK55 (https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob)
+# Modifications (2026): Mariano Boragno (refer to Git history for details)
+# License:             GNU General Public License v3.0 (GPLv3)
 # ===================================================================================         
 # Type "make help" in the command line.
 # ===================================================================================
@@ -22,7 +24,7 @@ CODE_SIZE  = 0x3800
 CC         = sdcc
 OBJCOPY    = objcopy
 PACK_HEX   = packihx
-WCHISP    ?= python3 tools/chprog.py
+WCHISP    ?= python3 tools/flash.py
 
 # Compiler Flags
 CFLAGS  = -mmcs51 --model-small --no-xinit-opt

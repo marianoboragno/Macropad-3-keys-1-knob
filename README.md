@@ -1,160 +1,394 @@
+![Macropad](https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob/assets/103085400/3a6453fc-e2b9-457d-84e9-b193e2463602)
 
-![20240426_140314](https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob/assets/103085400/3a6453fc-e2b9-457d-84e9-b193e2463602)
+# MacroPad Mini (3 Keys + 1 Knob) with CH552G
 
-# Macropad with 3 keys and 1 knob
-Custom firmware for a 3-key + rotary encoder macropad (Based on IC CH552g) (https://hackaday.io/project/189914)  
-Forked from [biemster/3keys_1knob](https://github.com/biemster/3keys_1knob/), which is based on [wagiminator/CH552-Macropad-mini](https://github.com/wagiminator/CH552-Macropad-mini/).
+> [!NOTE]
+> This fork was vibe-coded using **Google Gemini Flash 3.8** in **Antigravity CLI**. I used it to improve the original firmware, fix the rotary encoder double-stepping with a full-step FSM, implement clean switch debouncing, and add an autonomous USB HID lighting engine to control the RGB LEDs directly from the host.
 
-# Example data structure for the EEPROM
+Open-source firmware and technical documentation for the cheap 3-mechanical-key and 1-rotary-encoder MacroPad based on the **WCH CH552G** microcontroller.
 
+Features software debouncing, full-step finite state machine (FSM) rotary encoder decoding, key mapping via EEPROM (Data Flash), and **autonomous host-controlled addressable RGB lighting (WS2812B)** via USB HID.
 
-| Hex Address | 00 | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 0A | 0B |
-|-----------|----|----|----|----|----|----|----|----|----|----|----|----|
-| x0000000: | T0 | M0 | C0 | M1 | C1 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 
-| x000000c: | T1 | C0 | C1 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 
-| x0000018: | T2 | A0 | C0 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 |
+---
 
-T0 represents the type field of the first key  
-00 = keyboard key // 01 = consumer key // 02 = macro key  
+## 1. Hardware Overview & Architecture
 
-### For keyboard and consumer keys
-T0 represents the type field of the first key  
-00 = keyboard key // 01 = consumer key // 02 = macro key  
-  
-For keyboard  
-M0 represents the mod field of the first keyboad key  
-M1 represents the mod field of the second keyboard key   
-  
-C0 represents the code field of the first keyboad key  
-C1 represents the code field of the second keyboard key   
-  
-For Consumer   
-C0 represents the code field of the first consumer key  
-C1 represents the code field of the second consumer key  
-(rarelly you need a mod for consumer keys so it is not used)  
-  
-> [!NOTE] 
-> The keyboard and consumer keys have 2 states, this because in consumer keys Play/Pause are two different keys and for Keyboard becomes useful to have Ctrl+c and Ctrl+v in the same key  
+The MacroPad operates as a composite USB HID input device, acting simultaneously as a standard keyboard (HID Keyboard), multimedia controller (Consumer Control), and lighting controller (Vendor Output Report).
 
+### Hardware Architecture
 
-### For macro keys
-A0 represents the ammount of keys in the macro  
-**This number must be in Hex value, not decimal**
+```mermaid
+flowchart TD
+    subgraph Hardware ["MacroPad Mini"]
+        MCU["MCU WCH CH552G\n(8051 @ 16MHz, USB Full-Speed)"]
+        SW1["Key 1 (Cherry MX)"] -->|P1.1| MCU
+        SW2["Key 2 (Cherry MX)"] -->|P1.7| MCU
+        SW3["Key 3 (Cherry MX)"] -->|P1.6| MCU
+        ENC_SW["Knob Switch"] -->|P3.3| MCU
+        ENC_A["Encoder Out A"] -->|P3.1| MCU
+        ENC_B["Encoder Out B"] -->|P3.0| MCU
+        MCU -->|P3.4| NEO["3x WS2812B LEDs\n(Daisy-Chain)"]
+        MCU <-->|D+ (P3.6) / D- (P3.7)| USB["USB Type-C Connector"]
+    end
+    USB <--> Host["Host PC (Linux / Win / Mac)"]
+```
 
-  
-*for visibility reasons any 00 after any data its just an FF or empty field   
-00 is different than FF   
+1. **Microcontroller (MCU): WCH CH552G**
+   - Enhanced 8051 core running at 16 MHz using the internal oscillator (no external crystal required).
+   - 16 KB Flash memory (14 KB usable for code, ~2 KB factory ROM bootloader).
+   - 128 bytes Data Flash (used as non-volatile EEPROM for key configurations).
+   - Integrated native USB 2.0 Full-Speed controller.
+2. **Mechanical Keys:**
+   - 3 hot-swappable mechanical switches (Key 1, Key 2, Key 3) connected to ground with internal pull-up resistors active.
+   - 15 ms lockout software debouncing eliminates mechanical switch chatter without adding perceptible input latency.
+3. **Rotary Encoder (Knob):**
+   - Mechanical quadrature encoder with center detents and integrated tactile push switch.
+   - Decoded using **Ben Buxton's Full-Step Finite State Machine (FSM)**:
+     - Exactly 1 event emitted per physical detent (click).
+     - Full immunity to contact bounce and intermediate chatter.
+     - Zero reverse/glitch events when spun quickly.
+4. **RGB Illumination:**
+   - 3 addressable WS2812B LEDs (NeoPixels) placed under each switch.
+   - Single-wire high-speed serial bus on pin `P3.4` (800 kHz).
+   - Autonomous animation engine supporting 5 modes: `OFF`, `SOLID`, `BREATHE`, `BLINK`, and `REACTIVE`.
 
-## Visual Example data
+### Pinout Mapping (CH552G)
+| Function | MCU Pin | GPIO Mode | Description |
+| :--- | :---: | :--- | :--- |
+| **PIN_KEY1** | `P1.1` | Input with pull-up | Key 1 (left switch) |
+| **PIN_KEY2** | `P1.7` | Input with pull-up | Key 2 (center switch) |
+| **PIN_KEY3** | `P1.6` | Input with pull-up | Key 3 (right switch) |
+| **PIN_ENC_SW** | `P3.3` | Input with pull-up | Knob integrated push switch |
+| **PIN_ENC_A** | `P3.1` | Input with pull-up | Rotary encoder quadrature channel A |
+| **PIN_ENC_B** | `P3.0` | Input with pull-up | Rotary encoder quadrature channel B |
+| **PIN_NEO** | `P3.4` | Push-Pull Output | WS2812B data line (via 330Ω resistor) |
+| **USB D+ / BOOT** | `P3.6` | USB D+ / Input | USB D+ data line (forced pull-up triggers Bootloader) |
+| **USB D-** | `P3.7` | USB D- | USB D- data line |
 
-### Keyboard type
+---
 
-| Raw bytes         | Type     | Mod | Key | Mod2 | Key2 | Result | Result2 |
-| ----------- | --- | ----     | ---- | --- | --- | --- | --- |  
-| 00 00 04 00 04 .. | Keyboard | None | a | None | a | a | a |
-| 00 02 04 02 04 .. | Keyboard | Shift | a | Shift | a | A | A |
-| 00 01 06 01 19 .. | Keyboard | Ctrl | c | Ctrl | v | Ctrl+C | Ctrl+V |
-| 00 05 4C 03 29 .. | Keyboard | Ctrl+Alt | DEL | Ctrl+Shift | ESC | Ctrl+Alt+DEL | Ctrl+Shift+ESC |
+## 2. Entering Bootloader Mode
 
+The CH552 includes a factory ROM bootloader that enables flashing firmware directly over USB without external hardware programmers.
 
-### Consumer Type  
+```
+       ┌───────────────────────┐
+       │    BOOTLOADER MODE    │
+       │  VID:PID = 4348:55e0  │
+       └───────────┬───────────┘
+                   │
+       ┌───────────┴───────────┐
+       ▼                       ▼
+ [Method A - Software]     [Method B - Hardware]
+ Hold KEY 1 while          1kΩ resistor between
+ plugging in USB           P3.6 (D+) and 5V (VBUS)
+ (Running this firmware)   (Blank / unprogrammed chip)
+```
 
-| Raw bytes | Type | Key | Key2 |
-| -------- | ------ |  --- |  --- | 
-| 01 B6 B6 .. | Consumer | Previous | Previous | 
-| 01 B0 B1 .. | Consumer | Play | Pause |
-| 01 E9 E9 .. | Consumer | Vol + | Vol + |
-| 01 EA EA .. | Consumer | Vol - | Vol - |
+### Method A: Software Trigger (Recommended)
+1. Unplug the USB cable from the MacroPad.
+2. Press and hold **KEY 1** (the leftmost mechanical key).
+3. Plug the USB cable back into your computer and release the key.
+4. The firmware detects the held key at startup, briefly lights the LEDs white, and transfers execution to the ROM bootloader (`BOOT_now()`).
+5. Running `lsusb` will show:
+   ```text
+   ID 4348:55e0 WinChipHead
+   ```
 
-### Macro Type
+### Method B: Hardware Pull-up via 1kΩ Resistor (For blank or bricked chips)
+If the MCU is unprogrammed, has corrupted firmware, or runs a third-party firmware that does not support key triggers:
+1. The WCH bootloader checks at power-on if line `D+` (`P3.6`) is pulled high.
+2. With the board disconnected, temporarily place a **1 kΩ resistor (or jumper wire on boards with a BOOT button) between pin P3.6 (D+) and 5V (VCC / VBUS)**.
+3. Plug in the USB cable. Once the host detects the device in bootloader mode (`4348:55e0`), remove the resistor.
 
-| Raw bytes | Type | # of Keys | Code | Code1 | Code2 | Result |   
-| -------- | ------ |  --- |  --- |  --- | --- | --- |
-| 02 03 06 04 17 .. | Macro | 3 | c | a | t | cat |
-| 02 03 07 12 0A .. | Macro | 3 | d | o | g | dog |
+---
 
-# Compilation
+## 3. Building and Flashing
 
-### compile:
-`$ make bin`
+### 3.1. Toolchain & Dependencies Requirements
+- **Compiler:** `sdcc` (Small Device C Compiler)
+- **Python Dependencies:** `pyusb`, `ch55xtool`, `evdev`
 
-### compile & flash to pad:
-- if on original firmware: depending on hardware you need to connect P3.6 to
-  5V (VCC) using a 1k resistor or P1.5 to GND, while connecting USB
-- if on this firmware: press key1 while connecting USB
-- `$ make flash`
+Install compiler on Arch Linux:
+```bash
+sudo pacman -S sdcc
+```
+Install compiler on Debian / Ubuntu:
+```bash
+sudo apt install sdcc
+```
 
-### configure keys:
-1. `$ isp55e0 --data-dump flashdata.bin`
-2. edit this binary (3 keys, plus 3 for the knob), and write it back:
-3. `$ isp55e0 --data-flash flashdata.bin`
+Install Python tools dependencies:
+```bash
+pip install -r tools/requirements.txt
+```
 
+### 3.2. Compiling Firmware
+```bash
+make bin
+```
+This generates the binary file `3keys_1knob.bin`.
 
-### Documentation
+### 3.3. Flashing Firmware (Code Flash)
+With the MacroPad in Bootloader mode (Method A or B):
+```bash
+make flash
+# or manually:
+sudo python3 tools/flash.py 3keys_1knob.bin
+```
 
-  [CH552x Datasheet ](https://www.wch-ic.com/downloads/CH552DS1_PDF.html)  
-  [USB HID Codes](https://usb.org/sites/default/files/hut1_21_0.pdf#page=83)   
-  [isp55e0](https://github.com/frank-zago/isp55e0)  
+---
 
-### Modifiers
+## 4. Key Mapping & Configuration (EEPROM / Data Flash)
 
- | ID | Function |  
- | --- | --- |
- | 00 | None  |  
- | 01 | Ctrl  |  
- | 02 | Shift | 
- | 03 | Ctrl + Shift |   
- | 04 | Alt |   
- | 05 | Ctrl + Alt | 
- | 06 | Shift + Alt | 
- | 07 | Ctrl + Shift + Alt | 
+The CH552 features 128 bytes of non-volatile Data Flash. Key definitions are stored in a table containing **6 slots of 12 bytes each** (72 bytes total):
 
-### Consumer Keyboard Keycodes
-  
-|ID	|Function|
-| --- | --- |
-|30	|SYS_POWER |
-|31|	SYS_RESET|
-|32| SYS_SLEEP|
-|E2|	VOL_MUTE|
-|E9|	VOL_UP|
-|EA|	VOL_DOWN|
-|B0|	CON_MEDIA_PLAY|
-|B1|	CON_MEDIA_PAUSE|
-|B2| CON_MEDIA_RECORD|
-|B3|	MEDIA_FORWARD|
-|B4|	MEDIA_REWIND|
-|B5|	MEDIA_NEXT|
-|B6|	MEDIA_PREV|
-|B7|	MEDIA_STOP|
-|B8|	MEDIA_EJECT|
-|B9|	MEDIA_RANDOM|
-|40|	MENU|
-|41|	MENU_PICK|
-|42|	MENU_UP|
-|43|	MENU_DOWN|
-|44|	MENU_LEFT|
-|45|	MENU_RIGHT|
-|46|	MENU_ESCAPE|
-|47|	MENU_INCR|
-|48|	MENU_DECR|
+```text
+Offset       Target Control
+------       ----------------------------------------------
+0x00 - 0x0B: Key 1 (left switch)
+0x0C - 0x17: Key 2 (center switch)
+0x18 - 0x23: Key 3 (right switch)
+0x24 - 0x2F: Rotary knob push button
+0x30 - 0x3B: Knob clockwise rotation (CW)
+0x3C - 0x47: Knob counter-clockwise rotation (CCW)
+```
 
+### 4.1. Slot Structure (12 Bytes per Key)
 
+The first byte (`Byte 0`) defines the key type:
 
-# Notes:
-### Functions not supported yet by only reading the EEPROM  
-- Strings of text (you may need a bigger EEPROM) (maybe a huffman algorithm)
-- Mouse movements/clicks (not sure, not tested)
-- Modifiers on macro secuences
-- Modifiers on consumer keys
+#### Type 0x00: Standard Keyboard
+Supports up to two alternating states (toggle) with modifiers:
+```text
+Byte 0: 0x00 (Keyboard Type)
+Byte 1: Modifier 1 (Ctrl, Shift, Alt, etc.)
+Byte 2: HID Keycode 1 (e.g. 0x04 = 'a')
+Byte 3: Modifier 2 (for alternating state)
+Byte 4: HID Keycode 2
+Bytes 5..11: 0x00 (Reserved padding)
+```
 
-i still havent found the way to make work the RIGTH_GUI and LEFT_GUI keys  
-(aka windows keys or Apple equivalent)
+#### Type 0x01: Consumer / Multimedia Key
+Sends media commands such as volume up/down, mute, or play/pause:
+```text
+Byte 0: 0x01 (Consumer Type)
+Byte 1: Consumer Code 1 LSB (e.g. 0xE9 = Vol +)
+Byte 2: Consumer Code 1 MSB (e.g. 0x00)
+Byte 3: Consumer Code 2 LSB
+Byte 4: Consumer Code 2 MSB
+Bytes 5..11: 0x00 (Reserved padding)
+```
 
+#### Type 0x02: Macro Sequence
+Emits a sequential stream of keycodes on press:
+```text
+Byte 0: 0x02 (Macro Type)
+Byte 1: Keystroke count in sequence (up to 10)
+Bytes 2..11: Consecutive HID keycodes sent with inter-keystroke delays.
+```
 
-### Yet to implement
+### 4.2. Reference Tables
 
-- After a key is pressed and changes to Second key, add a delay to change it automatically to First Key 
-- 
--
-(no idea of what else could it need)
+#### Keyboard Modifiers
+| Hex Value | Modifier |
+| :---: | :--- |
+| `0x00` | None |
+| `0x01` | Ctrl |
+| `0x02` | Shift |
+| `0x03` | Ctrl + Shift |
+| `0x04` | Alt |
+| `0x05` | Ctrl + Alt |
+| `0x06` | Shift + Alt |
+| `0x07` | Ctrl + Shift + Alt |
+
+#### Common Consumer / Multimedia Codes
+| Hex Code | Function |
+| :---: | :--- |
+| `0x00E2` | Mute |
+| `0x00E9` | Volume Up |
+| `0x00EA` | Volume Down |
+| `0x00B0` | Play |
+| `0x00B1` | Pause |
+| `0x00B5` | Next Track |
+| `0x00B6` | Previous Track |
+| `0x00B7` | Stop |
+
+### 4.3. Keymap Configuration via JSON (`keymap.json`)
+Keys and knob actions are comfortably configured in human-readable JSON using [`keymap.json`](keymap.json) in the project root:
+
+```json
+{
+  "key1": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "c"
+  },
+  "key2": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "v"
+  },
+  "key3": {
+    "type": "keyboard",
+    "mod": ["ctrl"],
+    "key": "z"
+  },
+  "knob_switch": {
+    "type": "consumer",
+    "action": "mute"
+  },
+  "knob_cw": {
+    "type": "consumer",
+    "action": "volume_up"
+  },
+  "knob_ccw": {
+    "type": "consumer",
+    "action": "volume_down"
+  }
+}
+```
+
+#### Slot Names & Aliases
+Each of the 6 physical inputs can be referenced by its canonical name or common aliases:
+| Input Slot | Canonical Key | Recognized Aliases |
+| :--- | :--- | :--- |
+| Left Mechanical Switch | `"key1"` | `"k1"`, `"1"`, `"left"` |
+| Center Mechanical Switch | `"key2"` | `"k2"`, `"2"`, `"middle"`, `"center"` |
+| Right Mechanical Switch | `"key3"` | `"k3"`, `"3"`, `"right"` |
+| Rotary Knob Tactile Switch | `"knob_switch"` | `"knob_sw"`, `"knob_click"`, `"knob_button"`, `"enc_sw"` |
+| Rotary Knob Clockwise | `"knob_cw"` | `"knob_right"`, `"enc_cw"`, `"cw"` |
+| Rotary Knob Counter-Clockwise | `"knob_ccw"` | `"knob_left"`, `"enc_ccw"`, `"ccw"` |
+
+---
+
+#### Key Definition Types & Reference
+
+##### 1. Standard Keyboard (`"type": "keyboard"`)
+* **`mod` (Modifiers):** List of modifier strings combined via bitwise OR:
+  - Left modifiers: `"ctrl"` (`"lctrl"`, `"control"`), `"shift"` (`"lshift"`), `"alt"` (`"lalt"`), `"gui"` (`"win"`, `"cmd"`, `"super"`, `"lgui"`).
+  - Right modifiers: `"rctrl"`, `"rshift"`, `"ralt"` (`"altgr"`), `"rgui"` (`"rwin"`, `"rcmd"`).
+  - You may also provide a direct bitmask in hex (e.g. `0x05` for Ctrl+Alt).
+* **`key` (Keycode):** Standard USB HID keyboard key:
+  - Letters: `"a"` through `"z"`
+  - Numbers: `"0"` through `"9"`
+  - Function keys: `"f1"` through `"f12"` (up to `"f24"`)
+  - Navigation & Control: `"enter"` (`"return"`), `"esc"` (`"escape"`), `"backspace"`, `"tab"`, `"space"`, `"delete"` (`"del"`), `"insert"`, `"home"`, `"end"`, `"pageup"` (`"pgup"`), `"pagedown"` (`"pgdn"`), `"up"`, `"down"`, `"left"`, `"right"`, `"capslock"`, `"printscreen"` (`"prtsc"`), `"scrolllock"`, `"pause"`.
+  - Symbols: `"-"`, `"="`, `"["`, `"]"`, `"\\"`, `";"`, `"'"` , ``"`"``, `","`, `"."`, `"/"`.
+  - Raw Hex: Direct HID keycode string or integer (e.g. `"0x06"` for `'c'`).
+* **Alternating / Toggle Key:** To send alternating keys on successive presses:
+  ```json
+  "key1": {
+    "type": "keyboard",
+    "toggle": [
+      { "mod": ["ctrl"], "key": "c" },
+      { "mod": ["ctrl"], "key": "v" }
+    ]
+  }
+  ```
+
+##### 2. Consumer / Multimedia (`"type": "consumer"`)
+* **`action` (or `key`):** 16-bit USB HID Consumer usage name or raw code:
+  - Audio: `"mute"` (`0x00E2`), `"volume_up"` (`0x00E9`), `"volume_down"` (`0x00EA`).
+  - Playback: `"play_pause"` (`0x00CD`), `"stop"` (`0x00B7`), `"next_track"` (`0x00B5`), `"prev_track"` (`0x00B6`).
+  - Display & System: `"brightness_up"` (`0x006F`), `"brightness_down"` (`0x0070`), `"eject"` (`0x00B8`).
+  - Applications: `"calculator"` (`"calc"`, `0x0192`), `"media_player"` (`"media"`, `0x0183`), `"browser"` (`"browser_home"`, `0x0223`), `"browser_back"` (`0x0224`), `"browser_forward"` (`0x0225`), `"browser_refresh"` (`0x0227`).
+  - Raw Hex: Any 16-bit code formatted as hex or integer (e.g. `"0x00E2"` or `226`).
+
+##### 3. Macro Sequence (`"type": "macro"`)
+* **`keys`:** An array of up to 10 consecutive keycodes typed in sequence upon pressing the switch:
+  ```json
+  "key3": {
+    "type": "macro",
+    "keys": ["h", "e", "l", "l", "o", "enter"]
+  }
+  ```
+
+#### Compile-Time Validation & Safety
+The compiler (`tools/keymap.py`) validates all names, modifiers, and keycodes **on your host PC before touching the USB interface or erasing the microcontroller**:
+* Typing an unknown modifier (e.g. `"mod": ["ctrol"]`) immediately raises:
+  `ValueError: Unknown modifier: ctrol`
+* Typing an unlisted keycode or typo (e.g. `"key": "unknown_key"`) raises:
+  `ValueError: Unknown keycode: unknown_key`
+* The flashing process is aborted immediately without writing corrupt or invalid bytes to the device EEPROM.
+
+### 4.4. Flashing and EEPROM Tools
+The unified flasher [`tools/flash.py`](tools/flash.py) manages both firmware and EEPROM configuration:
+
+- **Flash firmware AND keymap (default):**
+  ```bash
+  python tools/flash.py
+  ```
+- **Flash ONLY the EEPROM keymap (without touching firmware):**
+  ```bash
+  python tools/flash.py --eeprom-only
+  # or using a custom keymap:
+  python tools/flash.py --eeprom-only -k my_custom_keys.json
+  ```
+- **Flash ONLY the firmware binary (without touching EEPROM):**
+  ```bash
+  python tools/flash.py --skip-eeprom
+  ```
+- **Read / backup active EEPROM:**
+  ```bash
+  python tools/dump_eeprom.py eeprom_backup.bin
+  ```
+
+---
+
+## 5. Host-Controlled RGB Lighting
+
+The firmware provides an autonomous USB HID lighting subsystem. **The host issues a single command, and the microcontroller handles rendering and timing independently.**
+
+### 5.1. udev Rule (Access without root)
+Install the udev rule to allow non-root users to control the LEDs:
+```bash
+sudo cp tools/udev/99-macropad.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### 5.2. Using the CLI Tool (`macropad_led.py`)
+```bash
+# 1. Set LED 1 to solid green
+python3 tools/macropad_led.py 1 --solid green
+
+# 2. Set LED 2 to smooth blue breathing with a 4-second period
+python3 tools/macropad_led.py 2 --breathe 4s "#0022FA"
+
+# 3. Set LED 3 blinking red every 1 second
+python3 tools/macropad_led.py 3 --blink 1s red
+
+# 4. Synchronize all 3 LEDs breathing purple together (100% in phase)
+python3 tools/macropad_led.py all --breathe 3s purple
+
+# 5. Restore reactive mode on physical key presses
+python3 tools/macropad_led.py all --reactive
+
+# 6. Turn off all LEDs
+python3 tools/macropad_led.py all --off
+```
+
+### 5.3. Developer Interface Specification (ICD)
+For developers building custom host applications, daemons, or system integrations in Python, C, Go, or Rust, consult the complete specification:
+👉 **[View Interface Control Document (ICD.md)](ICD.md)**
+
+---
+
+## 6. License and Credits
+
+This firmware is a derivative work based on the following projects:
+1. Original CH552 USB/HID firmware framework: [CH552-Macropad-mini](https://github.com/wagiminator/CH552-Macropad-mini) by **Stefan Wagner (wagiminator)**, licensed under [CC BY-SA 3.0 Unported](https://creativecommons.org/licenses/by-sa/3.0/).
+2. Hardware reverse-engineering, rotary encoder support, and EEPROM layout: [3keys_1knob](https://github.com/biemster/3keys_1knob) by **biemster** ([Hackaday Project](https://hackaday.io/project/189914)).
+3. Extended macro, toggle, and consumer key implementations: [Macropad-3-keys-1-knob](https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob) by **MrGeorgeK55**.
+
+Pursuant to Section 4(b) of CC BY-SA 3.0 (permitting adaptations to be licensed under a later version) and Section 3(b)(1) of CC BY-SA 4.0 (designating the GNU General Public License v3.0 as a BY-SA Compatible License), this adaptation and all modifications by Mariano Boragno are licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+See the [LICENSE](LICENSE) file for the full license text. Note that `tools/chprog.py` retains its original **MIT License** by Stefan Wagner.
+
+### Summary of Changes from Original
+- **Full-Step FSM Rotary Encoder Debouncing:** Implemented Ben Buxton's state machine to eliminate double-stepping, missed detents, and erratic reverse triggers.
+- **Switch Lockout Debounce:** Added 15 ms non-blocking lockout filter to eliminate mechanical contact chatter.
+- **Autonomous RGB LED Subsystem:** Implemented on-chip animation engine for WS2812B LEDs with 5 modes (Solid, Breathe, Blink, Reactive, Off) running independently from the host.
+- **USB HID Output Protocol (Report ID 3):** Added Endpoint 2 OUT with a vendor-defined collection (`0xFF00`) to control lighting in real-time from any OS without root/admin restrictions.
+- **Anti-Flash & Phase Synchronization:** Added atomic blackout, parameter latching, and phase reset sequence to synchronize all LEDs smoothly.
+- **Documentation & Tooling:** Complete Interface Control Document (ICD), automated flasher, Python CLI utility, and Linux udev rules.

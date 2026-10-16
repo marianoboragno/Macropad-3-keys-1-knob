@@ -43,7 +43,7 @@
 
 import usb.core
 import usb.util
-import sys, struct
+import sys, struct, platform
 
 
 # ===================================================================================
@@ -228,7 +228,7 @@ class Programmer:
     def __erasev1(self):
         self.__sendcmd((0xa6, 0x04, 0x00, 0x00, 0x00, 0x00))
         for x in range(self.device_flash_size):
-            buffer = __sendcmd((0xa9, 0x02, 0x00, x * 4))
+            buffer = self.__sendcmd((0xa9, 0x02, 0x00, x * 4))
             if buffer[0] != 0x00:
                 raise Exception('Erase failed')
 

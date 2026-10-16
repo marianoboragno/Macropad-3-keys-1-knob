@@ -108,7 +108,7 @@ inline void CLK_external(void) {
   SAFE_MOD = 0x00;                              // terminate safe mode
 }
 
-inline void CLK_inernal(void) {
+inline void CLK_internal(void) {
   SAFE_MOD = 0x55;
   SAFE_MOD = 0xAA;                              // enter safe mode
   CLOCK_CFG |=  bOSC_EN_INT;                    // turn on internal oscillator

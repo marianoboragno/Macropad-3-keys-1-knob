@@ -1,5 +1,8 @@
 // ===================================================================================
 // USB Handler for CH551, CH552 and CH554
+// 2023 by Stefan Wagner (https://github.com/wagiminator)
+// Modifications (2026): Mariano Boragno (refer to Git history for details)
+// License: GNU General Public License v3.0 (GPLv3)
 // ===================================================================================
 
 #include "ch554.h"
@@ -7,7 +10,7 @@
 
 uint16_t SetupLen;
 uint8_t  SetupReq, UsbConfig;
-__code uint8_t *pDescr;
+__code const uint8_t *pDescr;
 
 // ===================================================================================
 // Fast Copy Function
