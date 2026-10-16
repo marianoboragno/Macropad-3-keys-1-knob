@@ -1,0 +1,7 @@
+# Rules for MacroPad Mini (CH552G)
+
+# 1. Operational Mode: RGB LED Control via hidraw (VID: 1189, PID: 8890)
+KERNEL=="hidraw*", ATTRS{idVendor}=="1189", ATTRS{idProduct}=="8890", MODE="0666", TAG+="uaccess"
+
+# 2. Bootloader / ISP Mode: Firmware & EEPROM Flashing (VID: 4348, PID: 55e0)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="4348", ATTRS{idProduct}=="55e0", MODE="0666", TAG+="uaccess"

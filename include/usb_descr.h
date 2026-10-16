@@ -1,5 +1,10 @@
 // ===================================================================================
 // USB Descriptors and Definitions
+// 2023 by Stefan Wagner (https://github.com/wagiminator)
+// Hardware RE & Knob: biemster (https://github.com/biemster/3keys_1knob)
+// Extended Features:  MrGeorgeK55 (https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob)
+// Modifications (2026): Mariano Boragno (refer to Git history for details)
+// License: GNU General Public License v3.0 (GPLv3)
 // ===================================================================================
 //
 // Definition of USB descriptors and endpoint sizes and addresses.
@@ -45,14 +50,14 @@ typedef struct _USB_CFG_DESCR_HID {
 } USB_CFG_DESCR_HID, *PUSB_CFG_DESCR_HID;
 typedef USB_CFG_DESCR_HID __xdata *PXUSB_CFG_DESCR_HID;
 
-extern __code USB_DEV_DESCR DevDescr;
-extern __code USB_CFG_DESCR_HID CfgDescr;
+extern __code const USB_DEV_DESCR DevDescr;
+extern __code const USB_CFG_DESCR_HID CfgDescr;
 
 // ===================================================================================
 // HID Report Descriptors
 // ===================================================================================
-extern __code uint8_t ReportDescr[];
-extern __code uint8_t ReportDescrLen;
+extern __code const uint8_t ReportDescr[];
+extern __code const uint8_t ReportDescrLen;
 
 #define USB_REPORT_DESCR      ReportDescr
 #define USB_REPORT_DESCR_LEN  ReportDescrLen
@@ -60,11 +65,11 @@ extern __code uint8_t ReportDescrLen;
 // ===================================================================================
 // String Descriptors
 // ===================================================================================
-extern __code uint16_t LangDescr[];
-extern __code uint16_t ManufDescr[];
-extern __code uint16_t ProdDescr[];
-extern __code uint16_t SerDescr[];
-extern __code uint16_t InterfDescr[];
+extern __code const uint16_t LangDescr[];
+extern __code const uint16_t ManufDescr[];
+extern __code const uint16_t ProdDescr[];
+extern __code const uint16_t SerDescr[];
+extern __code const uint16_t InterfDescr[];
 
 #define USB_STR_DESCR_i0    (uint8_t*)LangDescr
 #define USB_STR_DESCR_i1    (uint8_t*)ManufDescr

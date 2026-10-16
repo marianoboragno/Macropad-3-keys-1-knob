@@ -1,4 +1,7 @@
-testing/
+# Binary files
+*.bin
+
+# SDCC build artifacts
 *.ihx
 *.lk
 *.map
@@ -9,6 +12,9 @@ testing/
 *.sym
 *.asm
 *.adb
+
+# Python artifacts & environments
 __pycache__/
 *.pyc
-
+.venv/
+venv/

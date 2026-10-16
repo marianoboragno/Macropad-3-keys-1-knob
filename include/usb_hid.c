@@ -1,5 +1,8 @@
 // ===================================================================================
 // USB HID Functions for CH551, CH552 and CH554
+// 2023 by Stefan Wagner (https://github.com/wagiminator)
+// Modifications (2026): Mariano Boragno (refer to Git history for details)
+// License: GNU General Public License v3.0 (GPLv3)
 // ===================================================================================
 
 #include "ch554.h"
@@ -66,6 +69,16 @@ void HID_EP1_IN(void) {
   HID_EP1_writeBusyFlag = 0;                                // clear busy flag
 }
 
+volatile __bit led_cmd_pending = 0;
+__xdata uint8_t led_cmd_buf[16];
+
 // Endpoint 2 OUT handler (HID report transfer from host)
 void HID_EP2_OUT(void) {                                    // auto response
+  uint8_t i;
+  if (EP2_buffer[0] == 3) {                                 // Vendor Report ID 3 (LED command)
+    for (i = 0; i < 16; i++) {
+      led_cmd_buf[i] = EP2_buffer[i];
+    }
+    led_cmd_pending = 1;
+  }
 }

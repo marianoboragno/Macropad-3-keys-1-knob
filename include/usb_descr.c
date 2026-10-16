@@ -1,5 +1,10 @@
 // ===================================================================================
 // USB Descriptors
+// 2023 by Stefan Wagner (https://github.com/wagiminator)
+// Hardware RE & Knob: biemster (https://github.com/biemster/3keys_1knob)
+// Extended Features:  MrGeorgeK55 (https://github.com/MrGeorgeK55/Macropad-3-keys-1-knob)
+// Modifications (2026): Mariano Boragno (refer to Git history for details)
+// License: GNU General Public License v3.0 (GPLv3)
 // ===================================================================================
 
 #include "config.h"
@@ -8,7 +13,7 @@
 // ===================================================================================
 // Device Descriptor
 // ===================================================================================
-__code USB_DEV_DESCR DevDescr = {
+__code const USB_DEV_DESCR DevDescr = {
   .bLength            = sizeof(DevDescr),       // size of the descriptor in bytes: 18
   .bDescriptorType    = USB_DESCR_TYP_DEVICE,   // device descriptor: 0x01
   .bcdUSB             = 0x0110,                 // USB specification: USB 1.1
@@ -28,7 +33,7 @@ __code USB_DEV_DESCR DevDescr = {
 // ===================================================================================
 // Configuration Descriptor
 // ===================================================================================
-__code USB_CFG_DESCR_HID CfgDescr = {
+__code const USB_CFG_DESCR_HID CfgDescr = {
 
   // Configuration Descriptor
   .config = {
@@ -90,7 +95,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
 // ===================================================================================
 // HID Report Descriptor
 // ===================================================================================
-__code uint8_t ReportDescr[] ={
+__code const uint8_t ReportDescr[] ={
     0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
     0x09, 0x06,                    // USAGE (Keyboard)
     0xa1, 0x01,                    // COLLECTION (Application)
@@ -137,31 +142,42 @@ __code uint8_t ReportDescr[] ={
     0x95, 0x04,                    //   REPORT_COUNT (4)
     0x75, 0x10,                    //   REPORT_SIZE (16)
     0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
+    0xc0,                          // END_COLLECTION
+    0x06, 0x00, 0xff,              // USAGE_PAGE (Vendor Defined Page 1)
+    0x09, 0x01,                    // USAGE (Vendor Usage 1)
+    0xa1, 0x01,                    // COLLECTION (Application)
+    0x85, 0x03,                    //   REPORT_ID (3)
+    0x09, 0x02,                    //   USAGE (Vendor Usage 2)
+    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
+    0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
+    0x75, 0x08,                    //   REPORT_SIZE (8)
+    0x95, 0x0f,                    //   REPORT_COUNT (15) -- 15 data bytes + 1 byte report ID = 16 bytes
+    0x91, 0x02,                    //   OUTPUT (Data,Var,Abs)
     0xc0                           // END_COLLECTION
 };
 
-__code uint8_t ReportDescrLen = sizeof(ReportDescr);
+__code const uint8_t ReportDescrLen = sizeof(ReportDescr);
 
 // ===================================================================================
 // String Descriptors
 // ===================================================================================
 
 // Language Descriptor (Index 0)
-__code uint16_t LangDescr[] = {
+__code const uint16_t LangDescr[] = {
   ((uint16_t)USB_DESCR_TYP_STRING << 8) | sizeof(LangDescr), 0x0409 };  // US English
 
 // Manufacturer String Descriptor (Index 1)
-__code uint16_t ManufDescr[] = {
+__code const uint16_t ManufDescr[] = {
   ((uint16_t)USB_DESCR_TYP_STRING << 8) | sizeof(ManufDescr), MANUFACTURER_STR };
 
 // Product String Descriptor (Index 2)
-__code uint16_t ProdDescr[] = {
+__code const uint16_t ProdDescr[] = {
   ((uint16_t)USB_DESCR_TYP_STRING << 8) | sizeof(ProdDescr), PRODUCT_STR };
 
 // Serial String Descriptor (Index 3)
-__code uint16_t SerDescr[] = {
+__code const uint16_t SerDescr[] = {
   ((uint16_t)USB_DESCR_TYP_STRING << 8) | sizeof(SerDescr), SERIAL_STR };
 
 // Interface String Descriptor (Index 4)
-__code uint16_t InterfDescr[] = {
+__code const uint16_t InterfDescr[] = {
   ((uint16_t)USB_DESCR_TYP_STRING << 8) | sizeof(InterfDescr), INTERFACE_STR };
