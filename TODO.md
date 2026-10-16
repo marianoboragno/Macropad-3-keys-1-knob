@@ -41,3 +41,25 @@ This document tracks planned architectural improvements, feature research, and p
   - Setting a modifier bit while leaving the keycode array as zero (`0x00`) transmits a modifier press to the host OS.
   - Investigate OS-level behavior across Linux, Windows, and macOS (e.g., single GUI tap opening the start/app menu, compositor shortcut behaviors, modifier hold vs tap).
   - Investigate configuration syntax and firmware handling: how `keymap.json`, `tools/keymap.py`, `tools/macropad_config.py`, and firmware `handle_key()` should represent a key mapping that only contains modifiers (e.g. `{"type": "keyboard", "mod": ["rgui"], "key": "none"}`).
+
+### 2.2. In-Browser Firmware Updates (WebUSB / Browser ISP Flashing)
+- **Status:** **UNDER RESEARCH / PLANNED FOR FUTURE**
+- **Description:** Investigate the feasibility of performing full microcontroller firmware flashing directly from a web page using the WebUSB API (`navigator.usb`) to communicate with the CH552 factory ISP bootloader (`VID:PID = 4348:55e0`).
+- **Technical Context & Questions to Explore:**
+  - Porting the WCH ISP handshake protocol (chip detection, encryption/obfuscation key exchange, block erase, chunked write, verification) to pure client-side JavaScript.
+  - Driver compatibility across platforms: Windows requires WinUSB driver bindings for WebUSB to access non-standard USB devices (typically requiring Zadig or automated driver association), whereas Linux and macOS provide native raw USB access.
+  - Evaluate user experience trade-offs vs desktop flashing scripts (`tools/flash.py`).
+
+### 2.3. Bidirectional Keymap Query (WebHID Auto-Sync on Connect)
+- **Status:** **PLANNED FOR FUTURE**
+- **Description:** Implement a read-back mechanism so host applications (such as `tools/macropad_gui.html` and `tools/macropad_config.py`) automatically fetch the active keymap and LED configuration from the MacroPad upon connection instead of defaulting to hardcoded factory presets.
+- **Technical Context & Implementation Steps:**
+  - **Firmware (`include/usb_handler.c` / `include/usb_descr.c`):**
+    - Add support for USB HID `GET_REPORT` class requests on Endpoint 0 (Feature Report or Input Report for Report ID `0x04`).
+    - When queried by the host for slot $0..5$, copy the 12-byte configuration from CH552 Data Flash (`0xC000 + slot * 12`) to the EP0 transfer buffer.
+  - **Web Configurator (`tools/macropad_gui.html`):**
+    - In `toggleConnection()`, upon successfully opening the device (`hidDevice.open()`), query all 6 slots using `navigator.hid` (`device.receiveFeatureReport(REPORT_ID_KEY, ...)`).
+    - Parse the received 12-byte payload per slot, update `slotsConfig`, and refresh the on-screen visual representation dynamically.
+  - **Host CLI (`tools/macropad_config.py`):**
+    - Add a `--dump` / `--read` command to read back the active keymap from the microcontroller and export it to `keymap.json`.
+

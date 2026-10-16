@@ -380,6 +380,14 @@ python tools/macropad_config.py --slot knob_sw --action play_pause
 python tools/macropad_config.py --slot key3 --macro h,e,l,l,o,enter
 ```
 
+#### Graphical Web Configurator (Zero-Dependency HTML)
+For a visual, non-technical interface without using the command line, open [`tools/macropad_gui.html`](tools/macropad_gui.html) in any Chromium-based browser (Google Chrome, Microsoft Edge, Brave, Opera). It uses the browser's native **WebHID API** to visually configure keys, macros, profiles, and RGB lighting with **zero external dependencies or libraries**:
+- Connects directly to the MacroPad over USB HID.
+- Interactive on-screen visual representation of the 3 keys and rotary knob.
+- Real-time key remapping with EEPROM commit or RAM-only testing.
+- Full RGB lighting studio with color picker and speed sliders.
+- Export and import `keymap.json` profiles.
+
 ### 4.5. Flashing and EEPROM Tools
 When flashing the full microcontroller or performing offline EEPROM programming via Bootloader mode:
 The unified flasher [`tools/flash.py`](tools/flash.py) manages both firmware and EEPROM configuration:

@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MacroPad Mini Configurator</title>
+  <style>
+    :root {
+      --bg-dark: #0f1117;
+      --bg-card: #181b24;
+      --bg-card-hover: #212634;
+      --bg-input: #10121a;
+      --border: #2b3245;
+      --accent: #4f8cff;
+      --accent-hover: #3b74e0;
+      --accent-glow: rgba(79, 140, 255, 0.35);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1050px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(79, 140, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(79, 140, 255, 0.3);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+      transition: all 0.3s ease;
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 12px var(--success);
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: var(--bg-card);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--text-muted);
+    }
+
+    button.success {
+      background: var(--success);
+      color: #fff;
+    }
+
+    button.success:hover:not(:disabled) {
+      background: #059669;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Warning banner */
+    .banner {
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fef3c7;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    /* Layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 860px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* MacroPad Visual Representation */
+    .pad-visual-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .pad-chassis {
+      background: linear-gradient(145deg, #1f2330, #131620);
+      border: 3px solid #333a4f;
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.05),
+                  0 16px 36px rgba(0, 0, 0, 0.7);
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .keys-row {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .keycap-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .keycap {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(180deg, #2c3345 0%, #1a1e2b 100%);
+      border: 2px solid #3d4760;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      box-shadow: 0 6px 0 #12151e,
+                  0 8px 16px rgba(0, 0, 0, 0.5);
+      transition: all 0.15s ease;
+      position: relative;
+      user-select: none;
+      padding: 4px;
+      text-align: center;
+    }
+
+    .keycap-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .keycap-sub {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      line-height: 1.15;
+      max-width: 64px;
+      word-break: break-word;
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    .keycap:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 0 #12151e, 0 10px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .keycap.active {
+      border-color: var(--accent);
+      box-shadow: 0 6px 0 #12151e, 0 0 20px var(--accent-glow);
+    }
+
+    .keycap:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #12151e, 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .led-glow-ring {
+      width: 44px;
+      height: 6px;
+      border-radius: 999px;
+      background: #000;
+      box-shadow: 0 0 14px rgba(0, 0, 0, 0.8);
+      transition: all 0.3s ease;
+    }
+
+    /* Rotary Knob Visual */
+    .knob-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      transition: opacity 0.25s ease, filter 0.25s ease;
+    }
+
+    .knob-container.disabled {
+      opacity: 0.22;
+      filter: grayscale(1);
+      cursor: not-allowed;
+    }
+
+    .knob-container.disabled * {
+      cursor: not-allowed !important;
+      pointer-events: none;
+    }
+
+    .knob-wheel {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #2d3448 30%, #151822 100%);
+      border: 4px solid #3f4a66;
+      box-shadow: 0 8px 0 #0f1118,
+                  0 12px 24px rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+
+    .knob-wheel:hover {
+      border-color: var(--accent);
+    }
+
+    .knob-wheel.active {
+      border-color: var(--accent);
+      box-shadow: 0 8px 0 #0f1118, 0 0 24px var(--accent-glow);
+    }
+
+    .knob-center-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #1e2230, #141722);
+      border: 2px solid #4a5573;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2px;
+      user-select: none;
+      line-height: 1.1;
+    }
+
+    .knob-rotations {
+      display: flex;
+      gap: 12px;
+    }
+
+    .knob-rot-btn {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border-radius: 20px;
+      background: #1c202d;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .knob-rot-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .knob-rot-btn.active {
+      border-color: var(--accent);
+      background: rgba(79, 140, 255, 0.15);
+      color: var(--accent);
+    }
+
+    /* Tabs & Controls */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 10px 16px;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      font-weight: 600;
+      border-radius: 0;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    /* Form groups */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--accent);
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: var(--bg-input);
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.88rem;
+      color: var(--text);
+      cursor: pointer;
+      text-transform: none;
+      font-weight: 500;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Color picker & Swatches */
+    .color-picker-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid var(--border);
+      width: 48px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      background: none;
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+
+    .swatches {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .swatch:hover {
+      transform: scale(1.2);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 50px;
+    }
+
+    /* Log / Console */
+    .console-card {
+      background: #0d0f14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #94a3b8;
+      max-height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse;
+    }
+
+    .console-entry {
+      margin-bottom: 4px;
+    }
+
+    .console-entry.success { color: var(--success); }
+    .console-entry.error { color: var(--danger); }
+    .console-entry.info { color: var(--accent); }
+
+    .help-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-title">
+        <h1>MacroPad Mini <span class="badge">CH552G</span></h1>
+      </div>
+      <div class="header-actions">
+        <div class="status-indicator">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Disconnected</span>
+        </div>
+        <button id="connectBtn" class="primary">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M6 .5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4H6zM7 1v3h3V1zM4 6.5a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5V11H4zM5 7v3h7V7zM1 12.5a.5.5 0 0 1 .5-.5h14a.5.5 0 0 1 .5.5V15a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm1 .5v2h13v-2z"/></svg>
+          Connect Device
+        </button>
+      </div>
+    </header>
+
+    <!-- Browser Warning Banner -->
+    <div class="banner" id="webhidWarning">
+      ⚠️ <strong>WebHID API is not supported in this browser.</strong> Please open this page in <strong>Google Chrome, Microsoft Edge, Brave</strong>, or any Chromium-based desktop browser to interact with the MacroPad directly.
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Left Column: Visual Hardware Representation -->
+      <div class="card">
+        <div class="card-title">
+          <span>MacroPad Hardware</span>
+          <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);" id="currentSlotLabel">Slot 0 (Key 1)</span>
+        </div>
+
+        <div class="pad-visual-container">
+          <div class="pad-chassis">
+            <!-- 3 Mechanical Keys with NeoPixel Glow Rings -->
+            <div class="keys-row">
+              <div class="keycap-slot" onclick="handleKeyClick(0)">
+                <div class="keycap active" id="keycap-0">
+                  <span class="keycap-title">KEY 1</span>
+                  <span class="keycap-sub" id="ksub-0">Ctrl+C</span>
+                </div>
+                <div class="led-glow-ring" id="glow-0"></div>
+              </div>
+
+              <div class="keycap-slot" onclick="handleKeyClick(1)">
+                <div class="keycap" id="keycap-1">
+                  <span class="keycap-title">KEY 2</span>
+                  <span class="keycap-sub" id="ksub-1">Ctrl+V</span>
+                </div>
+                <div class="led-glow-ring" id="glow-1"></div>
+              </div>
+
+              <div class="keycap-slot" onclick="handleKeyClick(2)">
+                <div class="keycap" id="keycap-2">
+                  <span class="keycap-title">KEY 3</span>
+                  <span class="keycap-sub" id="ksub-2">Ctrl+Z</span>
+                </div>
+                <div class="led-glow-ring" id="glow-2"></div>
+              </div>
+            </div>
+
+            <!-- Rotary Knob & Direction Controls -->
+            <div class="knob-container" id="knobContainer">
+              <div class="knob-wheel" id="knob-wheel" onclick="handleKnobClick(3)">
+                <div class="knob-center-btn" id="knob-center">
+                  <span style="font-size: 0.55rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">CLICK</span>
+                  <span style="font-size: 0.65rem; color: var(--text); font-weight: 600; max-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="ksub-3">Mute</span>
+                </div>
+              </div>
+              <div class="knob-rotations">
+                <button class="knob-rot-btn" id="knob-ccw-btn" onclick="handleKnobClick(5)">↺ Vol-</button>
+                <button class="knob-rot-btn" id="knob-cw-btn" onclick="handleKnobClick(4)">Vol+ ↻</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Configuration & Controls -->
+      <div class="card">
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('keys')">Key Actions</button>
+          <button class="tab-btn" onclick="switchTab('lighting')">RGB Lighting</button>
+          <button class="tab-btn" onclick="switchTab('profiles')">Profiles & Backup</button>
+        </div>
+
+        <!-- TAB 1: Key Actions Editor -->
+        <div class="tab-content active" id="tab-keys">
+          <div class="form-group">
+            <label>Input Slot to Remap</label>
+            <select id="slotSelector" onchange="selectSlot(parseInt(this.value))">
+              <option value="0">Key 1 (Left Mechanical Switch)</option>
+              <option value="1">Key 2 (Center Mechanical Switch)</option>
+              <option value="2">Key 3 (Right Mechanical Switch)</option>
+              <option value="3">Knob Push Button (Center Switch)</option>
+              <option value="4">Knob Clockwise (Turn Right)</option>
+              <option value="5">Knob Counter-Clockwise (Turn Left)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Action Category</label>
+            <select id="actionType" onchange="onActionTypeChange()">
+              <option value="keyboard">Standard Keyboard Keystroke</option>
+              <option value="consumer">Consumer / Multimedia Control</option>
+              <option value="macro">Macro Sequence (up to 10 keys)</option>
+            </select>
+          </div>
+
+          <!-- Section: Keyboard -->
+          <div id="keyboardControls">
+            <div class="form-group">
+              <label>Quick Preset</label>
+              <select id="quickPresetSelect" onchange="onQuickPresetChange()">
+                <option value="">-- Choose a Preset (Optional) --</option>
+                <option value="copy">Copy (Ctrl + C)</option>
+                <option value="paste">Paste (Ctrl + V)</option>
+                <option value="cut">Cut (Ctrl + X)</option>
+                <option value="undo">Undo (Ctrl + Z)</option>
+                <option value="select_all">Select All (Ctrl + A)</option>
+                <option value="save">Save (Ctrl + S)</option>
+                <option value="find">Find (Ctrl + F)</option>
+                <option value="new_tab">New Tab (Ctrl + T)</option>
+                <option value="close_tab">Close Tab (Ctrl + W)</option>
+                <option value="screenshot">Screenshot (Win + Shift + S)</option>
+                <option value="desktop">Show Desktop (Win + D)</option>
+                <option value="lock">Lock PC (Win + L)</option>
+                <option value="task_mgr">Task Manager (Ctrl + Shift + Esc)</option>
+                <option value="terminal">Open Terminal (Ctrl + Alt + T)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Modifiers</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="modCtrl" onchange="onManualModChange()"> Ctrl</label>
+                <label class="checkbox-label"><input type="checkbox" id="modShift" onchange="onManualModChange()"> Shift</label>
+                <label class="checkbox-label"><input type="checkbox" id="modAlt" onchange="onManualModChange()"> Alt</label>
+                <label class="checkbox-label"><input type="checkbox" id="modGui" onchange="onManualModChange()"> GUI (Win / Super)</label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Keycode</label>
+              <select id="keyCodeSelect" onchange="onManualModChange()"></select>
+            </div>
+          </div>
+
+          <!-- Section: Consumer -->
+          <div id="consumerControls" style="display: none;">
+            <div class="form-group">
+              <label>Multimedia Function</label>
+              <select id="consumerSelect"></select>
+            </div>
+          </div>
+
+          <!-- Section: Macro -->
+          <div id="macroControls" style="display: none;">
+            <div class="form-group">
+              <label>Keystroke Sequence (Comma-separated, max 10 keys)</label>
+              <input type="text" id="macroInput" placeholder="e.g. h, e, l, l, o, enter">
+              <div class="help-hint">Keys are sent sequentially with 5ms delays (e.g. 'c, t, r, l, enter').</div>
+            </div>
+          </div>
+
+          <!-- Storage Option -->
+          <div class="form-group" style="margin-top: 6px;">
+            <label class="checkbox-label" style="font-size: 0.92rem; font-weight: 600;">
+              <input type="checkbox" id="commitEeprom" checked>
+              Save permanently to EEPROM (Data Flash)
+            </label>
+            <div class="help-hint">Leave checked for persistent changes across reboots. Uncheck for temporary RAM-only testing without flash wear.</div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 10px;">
+            <button class="primary" id="applyKeyBtn" onclick="applyCurrentKey()">
+              Apply Key Action
+            </button>
+            <button class="secondary" onclick="applyAllKeysToDevice()">
+              Apply All 6 Slots
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: RGB Lighting Studio -->
+        <div class="tab-content" id="tab-lighting">
+          <div class="form-group">
+            <label>Target LED</label>
+            <select id="ledTargetSelect" onchange="updateLedTargetVisuals()">
+              <option value="255">All 3 LEDs (Synchronized in Phase)</option>
+              <option value="0">LED 1 (Key 1 - Left)</option>
+              <option value="1">LED 2 (Key 2 - Center)</option>
+              <option value="2">LED 3 (Key 3 - Right)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Animation Mode</label>
+            <select id="ledModeSelect" onchange="onLedModeChange()">
+              <option value="1">Solid Illumination</option>
+              <option value="2">Smooth Breathe (Breathing Animation)</option>
+              <option value="3">Blink (Square Wave)</option>
+              <option value="4">Reactive (Lights on Press, then Fades)</option>
+              <option value="0">Off (Completely Dark)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="colorPickerGroup">
+            <label>Target Color</label>
+            <div class="color-picker-row">
+              <input type="color" id="ledColorInput" value="#4f8cff" oninput="onColorPickerInput(this.value)">
+              <div class="swatches">
+                <div class="swatch" style="background: #ff0000;" onclick="setColor('#ff0000')" title="Red"></div>
+                <div class="swatch" style="background: #00ff00;" onclick="setColor('#00ff00')" title="Green"></div>
+                <div class="swatch" style="background: #0088ff;" onclick="setColor('#0088ff')" title="Blue"></div>
+                <div class="swatch" style="background: #ffff00;" onclick="setColor('#ffff00')" title="Yellow"></div>
+                <div class="swatch" style="background: #ff00ff;" onclick="setColor('#ff00ff')" title="Magenta"></div>
+                <div class="swatch" style="background: #00ffff;" onclick="setColor('#00ffff')" title="Cyan"></div>
+                <div class="swatch" style="background: #b400ff;" onclick="setColor('#b400ff')" title="Purple"></div>
+                <div class="swatch" style="background: #ffffff;" onclick="setColor('#ffffff')" title="White"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" id="brightnessGroup">
+            <label>Brightness Level</label>
+            <div class="slider-row">
+              <input type="range" id="brightnessSlider" min="5" max="100" step="5" value="100" oninput="onBrightnessInput(this.value)">
+              <span class="slider-val" id="brightnessVal">100%</span>
+            </div>
+            <div class="help-hint">Scales LED intensity. Useful for subtle glow and reducing desk glare.</div>
+          </div>
+
+          <div class="form-group" id="periodGroup">
+            <label>Animation Cycle Period (Speed)</label>
+            <div class="slider-row">
+              <input type="range" id="periodSlider" min="500" max="8000" step="100" value="2500" oninput="updatePeriodLabel(this.value)">
+              <span class="slider-val" id="periodVal">2.5s</span>
+            </div>
+            <div class="help-hint">Total cycle duration for breathe and blink animations.</div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 10px;">
+            <button class="primary" id="applyLedBtn" onclick="applyLighting()">
+              Apply Lighting
+            </button>
+            <button class="secondary" onclick="turnOffLeds()">
+              Turn Off All LEDs
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 3: Profiles & Backup -->
+        <div class="tab-content" id="tab-profiles">
+          <div class="form-group">
+            <label>Keymap Profile Management</label>
+            <div class="help-hint">Export your active key configuration to a standard `keymap.json` file or load a saved configuration from disk.</div>
+          </div>
+
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="secondary" onclick="exportKeymapJson()">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+              Export keymap.json
+            </button>
+            <button class="secondary" onclick="document.getElementById('importFileInput').click()">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+              Import keymap.json
+            </button>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importKeymapJson(event)">
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label>Factory Defaults</label>
+            <button class="secondary" onclick="loadFactoryDefaults()">
+              Reset Form to Factory Defaults (Ctrl+C, Ctrl+V, Ctrl+Z, Vol/Mute)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Console -->
+    <div class="console-card" id="consoleLogs">
+      <div class="console-entry info">[Ready] WebHID MacroPad Configurator initialized.</div>
+    </div>
+  </div>
+
+  <script>
+    // ===================================================================================
+    // Constants & Lookups
+    // ===================================================================================
+    const VENDOR_ID = 0x1189;
+    const PRODUCT_ID = 0x8890;
+    const REPORT_ID_LED = 0x03;
+    const REPORT_ID_KEY = 0x04;
+
+    let hidDevice = null;
+    let selectedSlot = 0;
+
+    // Standard USB HID Keycodes
+    const KEYCODES = [
+      { name: "a", code: 0x04 }, { name: "b", code: 0x05 }, { name: "c", code: 0x06 },
+      { name: "d", code: 0x07 }, { name: "e", code: 0x08 }, { name: "f", code: 0x09 },
+      { name: "g", code: 0x0A }, { name: "h", code: 0x0B }, { name: "i", code: 0x0C },
+      { name: "j", code: 0x0D }, { name: "k", code: 0x0E }, { name: "l", code: 0x0F },
+      { name: "m", code: 0x10 }, { name: "n", code: 0x11 }, { name: "o", code: 0x12 },
+      { name: "p", code: 0x13 }, { name: "q", code: 0x14 }, { name: "r", code: 0x15 },
+      { name: "s", code: 0x16 }, { name: "t", code: 0x17 }, { name: "u", code: 0x18 },
+      { name: "v", code: 0x19 }, { name: "w", code: 0x1A }, { name: "x", code: 0x1B },
+      { name: "y", code: 0x1C }, { name: "z", code: 0x1D },
+      { name: "1", code: 0x1E }, { name: "2", code: 0x1F }, { name: "3", code: 0x20 },
+      { name: "4", code: 0x21 }, { name: "5", code: 0x22 }, { name: "6", code: 0x23 },
+      { name: "7", code: 0x24 }, { name: "8", code: 0x25 }, { name: "9", code: 0x26 },
+      { name: "0", code: 0x27 },
+      { name: "Enter", code: 0x28 },
+      { name: "Escape", code: 0x29 },
+      { name: "Backspace", code: 0x2A },
+      { name: "Tab", code: 0x2B },
+      { name: "Spacebar", code: 0x2C },
+      { name: "F1", code: 0x3A }, { name: "F2", code: 0x3B }, { name: "F3", code: 0x3C },
+      { name: "F4", code: 0x3D }, { name: "F5", code: 0x3E }, { name: "F6", code: 0x3F },
+      { name: "F7", code: 0x40 }, { name: "F8", code: 0x41 }, { name: "F9", code: 0x42 },
+      { name: "F10", code: 0x43 }, { name: "F11", code: 0x44 }, { name: "F12", code: 0x45 },
+      { name: "Print Screen", code: 0x46 },
+      { name: "Delete", code: 0x4C },
+      { name: "Home", code: 0x4A },
+      { name: "End", code: 0x4D },
+      { name: "Page Up", code: 0x4B },
+      { name: "Page Down", code: 0x4E },
+      { name: "Right Arrow", code: 0x4F },
+      { name: "Left Arrow", code: 0x50 },
+      { name: "Down Arrow", code: 0x51 },
+      { name: "Up Arrow", code: 0x52 }
+    ];
+
+    // Quick Presets
+    const QUICK_PRESETS = {
+      copy: { mod: 0x01, key: 0x06 },       // Ctrl + C
+      paste: { mod: 0x01, key: 0x19 },      // Ctrl + V
+      cut: { mod: 0x01, key: 0x1B },        // Ctrl + X
+      undo: { mod: 0x01, key: 0x1D },       // Ctrl + Z
+      select_all: { mod: 0x01, key: 0x04 }, // Ctrl + A
+      save: { mod: 0x01, key: 0x16 },       // Ctrl + S
+      find: { mod: 0x01, key: 0x09 },       // Ctrl + F
+      new_tab: { mod: 0x01, key: 0x17 },    // Ctrl + T
+      close_tab: { mod: 0x01, key: 0x1A },  // Ctrl + W
+      screenshot: { mod: 0x0A, key: 0x16 }, // Win + Shift + S
+      desktop: { mod: 0x08, key: 0x07 },    // Win + D
+      lock: { mod: 0x08, key: 0x0F },       // Win + L
+      task_mgr: { mod: 0x03, key: 0x29 },   // Ctrl + Shift + Esc
+      terminal: { mod: 0x05, key: 0x17 }    // Ctrl + Alt + T
+    };
+
+    // Standard 16-bit Consumer Usages
+    const CONSUMER_CODES = [
+      { name: "Mute Audio", code: 0x00E2 },
+      { name: "Volume Up", code: 0x00E9 },
+      { name: "Volume Down", code: 0x00EA },
+      { name: "Play / Pause", code: 0x00CD },
+      { name: "Next Track", code: 0x00B5 },
+      { name: "Previous Track", code: 0x00B6 },
+      { name: "Stop Playback", code: 0x00B7 },
+      { name: "Brightness Up", code: 0x006F },
+      { name: "Brightness Down", code: 0x0070 },
+      { name: "Calculator App", code: 0x0192 },
+      { name: "Media Player App", code: 0x0183 },
+      { name: "Browser Home", code: 0x0223 }
+    ];
+
+    // Local state for all 6 slots
+    let slotsConfig = [
+      { type: "keyboard", mod: 0x01, key: 0x06 }, // Key 1: Ctrl+C
+      { type: "keyboard", mod: 0x01, key: 0x19 }, // Key 2: Ctrl+V
+      { type: "keyboard", mod: 0x01, key: 0x1D }, // Key 3: Ctrl+Z
+      { type: "consumer", code: 0x00E2 },          // Knob SW: Mute
+      { type: "consumer", code: 0x00E9 },          // Knob CW: Vol+
+      { type: "consumer", code: 0x00EA }           // Knob CCW: Vol-
+    ];
+
+    // ===================================================================================
+    // Initialization
+    // ===================================================================================
+    window.addEventListener("DOMContentLoaded", () => {
+      // Check WebHID support
+      if (!("hid" in navigator)) {
+        document.getElementById("webhidWarning").style.display = "block";
+        log("WebHID is not supported in this browser. Please use Chrome, Edge, or Brave.", "error");
+      }
+
+      // Populate dropdowns
+      const keySelect = document.getElementById("keyCodeSelect");
+      KEYCODES.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.code;
+        opt.textContent = item.name;
+        keySelect.appendChild(opt);
+      });
+
+      const conSelect = document.getElementById("consumerSelect");
+      CONSUMER_CODES.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.code;
+        opt.textContent = `${item.name} (0x${item.code.toString(16).padStart(4, "0").toUpperCase()})`;
+        conSelect.appendChild(opt);
+      });
+
+      // Hook connect button
+      document.getElementById("connectBtn").addEventListener("click", toggleConnection);
+
+      // Refresh slot form
+      selectSlot(0);
+      updateVisuals();
+    });
+
+    // Logging helper
+    function log(msg, type = "normal") {
+      const consoleBox = document.getElementById("consoleLogs");
+      const entry = document.createElement("div");
+      entry.className = `console-entry ${type}`;
+      const time = new Date().toLocaleTimeString();
+      entry.textContent = `[${time}] ${msg}`;
+      consoleBox.prepend(entry);
+    }
+
+    // ===================================================================================
+    // WebHID Connection
+    // ===================================================================================
+    async function toggleConnection() {
+      if (hidDevice && hidDevice.opened) {
+        await hidDevice.close();
+        hidDevice = null;
+        updateConnectionStatus(false);
+        log("MacroPad disconnected.", "info");
+        return;
+      }
+
+      try {
+        log("Requesting USB HID device from browser...", "info");
+        const devices = await navigator.hid.requestDevice({
+          filters: [{ vendorId: VENDOR_ID, productId: PRODUCT_ID }]
+        });
+
+        if (devices.length === 0) {
+          log("No device selected.", "error");
+          return;
+        }
+
+        hidDevice = devices[0];
+        if (!hidDevice.opened) {
+          await hidDevice.open();
+        }
+
+        updateConnectionStatus(true);
+        log(`Connected to MacroPad: ${hidDevice.productName || "CH552G"} (VID: 0x${VENDOR_ID.toString(16)}, PID: 0x${PRODUCT_ID.toString(16)})`, "success");
+      } catch (err) {
+        log(`Connection failed: ${err.message}`, "error");
+      }
+    }
+
+    function updateConnectionStatus(connected) {
+      const dot = document.getElementById("statusDot");
+      const text = document.getElementById("statusText");
+      const btn = document.getElementById("connectBtn");
+
+      if (connected) {
+        dot.classList.add("connected");
+        text.textContent = "Connected";
+        btn.textContent = "Disconnect";
+        btn.classList.remove("primary");
+        btn.classList.add("secondary");
+      } else {
+        dot.classList.remove("connected");
+        text.textContent = "Disconnected";
+        btn.innerHTML = `<svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M6 .5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4H6zM7 1v3h3V1zM4 6.5a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5V11H4zM5 7v3h7V7zM1 12.5a.5.5 0 0 1 .5-.5h14a.5.5 0 0 1 .5.5V15a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm1 .5v2h13v-2z"/></svg> Connect Device`;
+        btn.classList.remove("secondary");
+        btn.classList.add("primary");
+      }
+    }
+
+    // ===================================================================================
+    // UI Slots & Tabs Navigation
+    // ===================================================================================
+    function selectSlot(idx) {
+      selectedSlot = idx;
+      document.getElementById("slotSelector").value = idx;
+
+      // Update Visual active classes
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`keycap-${i}`).classList.toggle("active", idx === i);
+      }
+      document.getElementById("knob-wheel").classList.toggle("active", idx === 3);
+      document.getElementById("knob-cw-btn").classList.toggle("active", idx === 4);
+      document.getElementById("knob-ccw-btn").classList.toggle("active", idx === 5);
+
+      const labels = [
+        "Slot 0 (Key 1)", "Slot 1 (Key 2)", "Slot 2 (Key 3)",
+        "Slot 3 (Knob Click)", "Slot 4 (Knob CW)", "Slot 5 (Knob CCW)"
+      ];
+      document.getElementById("currentSlotLabel").textContent = labels[idx];
+
+      // Populate right-side form with current slot state
+      const conf = slotsConfig[idx];
+      document.getElementById("actionType").value = conf.type;
+      onActionTypeChange();
+
+      if (conf.type === "keyboard") {
+        document.getElementById("modCtrl").checked = !!(conf.mod & 0x01);
+        document.getElementById("modShift").checked = !!(conf.mod & 0x02);
+        document.getElementById("modAlt").checked = !!(conf.mod & 0x04);
+        document.getElementById("modGui").checked = !!(conf.mod & 0x08);
+        document.getElementById("keyCodeSelect").value = conf.key || 0x04;
+
+        // Sync preset dropdown
+        let matchedPreset = "";
+        for (const [pKey, pVal] of Object.entries(QUICK_PRESETS)) {
+          if (pVal.mod === conf.mod && pVal.key === conf.key) {
+            matchedPreset = pKey;
+            break;
+          }
+        }
+        document.getElementById("quickPresetSelect").value = matchedPreset;
+      } else if (conf.type === "consumer") {
+        document.getElementById("consumerSelect").value = conf.code || 0x00E2;
+        document.getElementById("quickPresetSelect").value = "";
+      } else if (conf.type === "macro") {
+        document.getElementById("macroInput").value = conf.macroStr || "";
+        document.getElementById("quickPresetSelect").value = "";
+      }
+    }
+
+    function onQuickPresetChange() {
+      const val = document.getElementById("quickPresetSelect").value;
+      if (!val || !QUICK_PRESETS[val]) return;
+      const p = QUICK_PRESETS[val];
+      document.getElementById("modCtrl").checked = !!(p.mod & 0x01);
+      document.getElementById("modShift").checked = !!(p.mod & 0x02);
+      document.getElementById("modAlt").checked = !!(p.mod & 0x04);
+      document.getElementById("modGui").checked = !!(p.mod & 0x08);
+      document.getElementById("keyCodeSelect").value = p.key;
+    }
+
+    function onManualModChange() {
+      document.getElementById("quickPresetSelect").value = "";
+    }
+
+    function onActionTypeChange() {
+      const type = document.getElementById("actionType").value;
+      document.getElementById("keyboardControls").style.display = (type === "keyboard") ? "block" : "none";
+      document.getElementById("consumerControls").style.display = (type === "consumer") ? "block" : "none";
+      document.getElementById("macroControls").style.display = (type === "macro") ? "block" : "none";
+    }
+
+    let activeTab = "keys";
+
+    function switchTab(tabId) {
+      activeTab = tabId;
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+
+      const knobContainer = document.getElementById("knobContainer");
+
+      if (tabId === "keys") {
+        document.querySelectorAll(".tab-btn")[0].classList.add("active");
+        document.getElementById("tab-keys").classList.add("active");
+        knobContainer.classList.remove("disabled");
+        knobContainer.removeAttribute("title");
+        selectSlot(selectedSlot);
+      } else if (tabId === "lighting") {
+        document.querySelectorAll(".tab-btn")[1].classList.add("active");
+        document.getElementById("tab-lighting").classList.add("active");
+        knobContainer.classList.add("disabled");
+        knobContainer.title = "The rotary knob does not have RGB LEDs";
+        updateLedTargetVisuals();
+      } else if (tabId === "profiles") {
+        document.querySelectorAll(".tab-btn")[2].classList.add("active");
+        document.getElementById("tab-profiles").classList.add("active");
+        knobContainer.classList.remove("disabled");
+        knobContainer.removeAttribute("title");
+        selectSlot(selectedSlot);
+      }
+    }
+
+    function handleKeyClick(idx) {
+      if (activeTab === "lighting") {
+        const select = document.getElementById("ledTargetSelect");
+        const currentTarget = parseInt(select.value);
+        if (currentTarget === idx) {
+          // Clicking again selects ALL 3 LEDs
+          select.value = "255";
+        } else {
+          select.value = idx.toString();
+        }
+        updateLedTargetVisuals();
+      } else {
+        selectSlot(idx);
+      }
+    }
+
+    function handleKnobClick(idx) {
+      if (activeTab === "lighting") return;
+      selectSlot(idx);
+    }
+
+    function updateLedTargetVisuals() {
+      const select = document.getElementById("ledTargetSelect");
+      const target = parseInt(select.value);
+
+      for (let i = 0; i < 3; i++) {
+        const keycap = document.getElementById(`keycap-${i}`);
+        if (target === 255 || target === i) {
+          keycap.classList.add("active");
+        } else {
+          keycap.classList.remove("active");
+        }
+      }
+
+      document.getElementById("knob-wheel").classList.remove("active");
+      document.getElementById("knob-cw-btn").classList.remove("active");
+      document.getElementById("knob-ccw-btn").classList.remove("active");
+
+      const label = document.getElementById("currentSlotLabel");
+      if (target === 255) {
+        label.textContent = "Target: All 3 LEDs (Synchronized)";
+      } else {
+        label.textContent = `Target: LED ${target + 1} (Key ${target + 1})`;
+      }
+    }
+
+    function getSlotDescriptions(conf) {
+      if (!conf) return { short: "None", full: "None" };
+      if (conf.type === "keyboard") {
+        const fullMods = [];
+        const shortMods = [];
+        if (conf.mod & 0x01) { fullMods.push("Ctrl"); shortMods.push("Ctrl"); }
+        if (conf.mod & 0x08) { fullMods.push("Win"); shortMods.push("Win"); }
+        if (conf.mod & 0x04) { fullMods.push("Alt"); shortMods.push("Alt"); }
+        if (conf.mod & 0x02) { fullMods.push("Shift"); shortMods.push("Sh"); }
+
+        const kObj = KEYCODES.find(k => k.code === conf.key);
+        let fullName = kObj ? kObj.name : `0x${conf.key.toString(16)}`;
+        if (fullName.length === 1 && fullName >= 'a' && fullName <= 'z') {
+          fullName = fullName.toUpperCase();
+        }
+        let shortName = fullName;
+        const KEY_ABBR = {
+          "Print Screen": "PrtSc",
+          "Page Up": "PgUp",
+          "Page Down": "PgDn",
+          "Backspace": "Bksp",
+          "Escape": "Esc",
+          "Spacebar": "Space",
+          "Delete": "Del",
+          "Enter": "Enter",
+          "Right Arrow": "Right",
+          "Left Arrow": "Left",
+          "Down Arrow": "Down",
+          "Up Arrow": "Up"
+        };
+        if (KEY_ABBR[fullName]) {
+          shortName = KEY_ABBR[fullName];
+        }
+
+        const fullStr = [...fullMods, fullName].join(" + ");
+        const shortStr = [...shortMods, shortName].join("+");
+        return { short: shortStr || "None", full: fullStr || "None" };
+      } else if (conf.type === "consumer") {
+        const cObj = CONSUMER_CODES.find(c => c.code === conf.code);
+        const fullName = cObj ? cObj.name : `0x${conf.code.toString(16)}`;
+        const CONSUMER_ABBR = {
+          "Mute Audio": "Mute",
+          "Volume Up": "Vol+",
+          "Volume Down": "Vol-",
+          "Play / Pause": "Play/Pause",
+          "Next Track": "Next",
+          "Previous Track": "Prev",
+          "Stop Playback": "Stop",
+          "Brightness Up": "Bright+",
+          "Brightness Down": "Bright-",
+          "Calculator App": "Calc",
+          "Media Player App": "Media",
+          "Browser Home": "Home"
+        };
+        const shortName = CONSUMER_ABBR[fullName] || fullName;
+        return { short: shortName, full: fullName };
+      } else if (conf.type === "macro") {
+        const full = `Macro: ${conf.macroStr || ""}`;
+        return { short: "Macro", full: full };
+      }
+      return { short: "None", full: "None" };
+    }
+
+    function updateVisuals() {
+      // Slots 0, 1, 2 (Keys 1-3)
+      for (let i = 0; i < 3; i++) {
+        const desc = getSlotDescriptions(slotsConfig[i]);
+        const subEl = document.getElementById(`ksub-${i}`);
+        subEl.textContent = desc.short;
+        subEl.title = desc.full;
+        document.getElementById(`keycap-${i}`).title = `Slot ${i} (Key ${i + 1}): ${desc.full}`;
+      }
+
+      // Slot 3 (Knob Click)
+      const descSW = getSlotDescriptions(slotsConfig[3]);
+      const ksub3 = document.getElementById("ksub-3");
+      ksub3.textContent = descSW.short;
+      ksub3.title = descSW.full;
+      document.getElementById("knob-center").title = `Knob Click: ${descSW.full}`;
+
+      // Slot 4 (Knob CW)
+      const descCW = getSlotDescriptions(slotsConfig[4]);
+      const btnCW = document.getElementById("knob-cw-btn");
+      btnCW.textContent = `${descCW.short} ↻`;
+      btnCW.title = `Turn CW: ${descCW.full}`;
+
+      // Slot 5 (Knob CCW)
+      const descCCW = getSlotDescriptions(slotsConfig[5]);
+      const btnCCW = document.getElementById("knob-ccw-btn");
+      btnCCW.textContent = `↺ ${descCCW.short}`;
+      btnCCW.title = `Turn CCW: ${descCCW.full}`;
+    }
+
+    // ===================================================================================
+    // Key Configuration Transmission (Report ID 0x04)
+    // ===================================================================================
+    function buildSlotPayload(slotIdx) {
+      const conf = slotsConfig[slotIdx];
+      // 15 data bytes: [slot, 12 bytes payload, 1 byte reserved, 1 byte flags]
+      const data = new Uint8Array(15);
+      data[0] = slotIdx & 0xFF;
+
+      const commitEeprom = document.getElementById("commitEeprom").checked;
+      let flags = commitEeprom ? 0x01 : 0x00;
+      flags |= 0x02; // RESET_STATE
+
+      if (conf.type === "keyboard") {
+        data[1] = 0; // KEYBOARD
+        data[2] = conf.mod & 0xFF;
+        data[3] = conf.key & 0xFF;
+        data[4] = conf.mod & 0xFF; // Duplicate state for non-toggle
+        data[5] = conf.key & 0xFF;
+      } else if (conf.type === "consumer") {
+        data[1] = 1; // CONSUMER
+        data[2] = conf.code & 0xFF;
+        data[3] = (conf.code >> 8) & 0xFF;
+        data[4] = conf.code & 0xFF;
+        data[5] = (conf.code >> 8) & 0xFF;
+      } else if (conf.type === "macro") {
+        data[1] = 2; // MACRO
+        const keysArr = (conf.macroKeys || []).slice(0, 10);
+        data[2] = keysArr.length;
+        for (let j = 0; j < keysArr.length; j++) {
+          data[3 + j] = keysArr[j];
+        }
+      }
+
+      data[13] = 0x00; // Reserved
+      data[14] = flags; // FLAGS (Byte 15 in EP2 buffer)
+      return data;
+    }
+
+    async function applyCurrentKey() {
+      // Save form into local memory
+      const type = document.getElementById("actionType").value;
+      if (type === "keyboard") {
+        let mod = 0;
+        if (document.getElementById("modCtrl").checked) mod |= 0x01;
+        if (document.getElementById("modShift").checked) mod |= 0x02;
+        if (document.getElementById("modAlt").checked) mod |= 0x04;
+        if (document.getElementById("modGui").checked) mod |= 0x08;
+        slotsConfig[selectedSlot] = {
+          type: "keyboard",
+          mod: mod,
+          key: parseInt(document.getElementById("keyCodeSelect").value)
+        };
+      } else if (type === "consumer") {
+        slotsConfig[selectedSlot] = {
+          type: "consumer",
+          code: parseInt(document.getElementById("consumerSelect").value)
+        };
+      } else if (type === "macro") {
+        const rawStr = document.getElementById("macroInput").value;
+        const tokens = rawStr.split(",").map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+        const resolvedKeys = [];
+        for (const t of tokens) {
+          const found = KEYCODES.find(k => k.name.toLowerCase().startsWith(t) || k.name.toLowerCase() === t);
+          if (found) resolvedKeys.push(found.code);
+          else if (!isNaN(parseInt(t))) resolvedKeys.push(parseInt(t));
+        }
+        slotsConfig[selectedSlot] = {
+          type: "macro",
+          macroStr: rawStr,
+          macroKeys: resolvedKeys
+        };
+      }
+
+      updateVisuals();
+
+      if (!hidDevice || !hidDevice.opened) {
+        log(`Saved Slot ${selectedSlot} locally. Connect device to apply to hardware.`, "info");
+        return;
+      }
+
+      try {
+        const reportData = buildSlotPayload(selectedSlot);
+        await hidDevice.sendReport(REPORT_ID_KEY, reportData);
+        log(`Slot ${selectedSlot} remapped successfully on hardware!`, "success");
+      } catch (err) {
+        log(`Error sending key config: ${err.message}`, "error");
+      }
+    }
+
+    async function applyAllKeysToDevice() {
+      if (!hidDevice || !hidDevice.opened) {
+        log("Cannot apply: Device is not connected.", "error");
+        return;
+      }
+
+      log("Applying all 6 slots to MacroPad...", "info");
+      for (let s = 0; s < 6; s++) {
+        try {
+          const reportData = buildSlotPayload(s);
+          await hidDevice.sendReport(REPORT_ID_KEY, reportData);
+          await new Promise(r => setTimeout(r, 20)); // Inter-packet flash write pause
+        } catch (err) {
+          log(`Failed on slot ${s}: ${err.message}`, "error");
+          return;
+        }
+      }
+      log("All 6 slots configured successfully on hardware!", "success");
+    }
+
+    // ===================================================================================
+    // RGB Lighting Studio Transmission (Report ID 0x03)
+    // ===================================================================================
+    let baseColorHex = "#4f8cff";
+    let currentBrightness = 100;
+
+    function getEffectiveRgb() {
+      const r = parseInt(baseColorHex.slice(1, 3), 16) || 0;
+      const g = parseInt(baseColorHex.slice(3, 5), 16) || 0;
+      const b = parseInt(baseColorHex.slice(5, 7), 16) || 0;
+      const factor = currentBrightness / 100;
+      return {
+        r: Math.round(r * factor),
+        g: Math.round(g * factor),
+        b: Math.round(b * factor)
+      };
+    }
+
+    function getEffectiveHex() {
+      const { r, g, b } = getEffectiveRgb();
+      return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
+    }
+
+    function onLedModeChange() {
+      const mode = parseInt(document.getElementById("ledModeSelect").value);
+      document.getElementById("colorPickerGroup").style.display = (mode === 0) ? "none" : "block";
+      document.getElementById("brightnessGroup").style.display = (mode === 0) ? "none" : "block";
+      document.getElementById("periodGroup").style.display = (mode === 2 || mode === 3) ? "block" : "none";
+      updateLiveColorPreview();
+    }
+
+    function setColor(hex) {
+      baseColorHex = hex;
+      const effHex = getEffectiveHex();
+      document.getElementById("ledColorInput").value = effHex;
+      updateLiveColorPreview();
+    }
+
+    function onColorPickerInput(hex) {
+      baseColorHex = hex;
+      updateLiveColorPreview();
+    }
+
+    function onBrightnessInput(val) {
+      currentBrightness = parseInt(val);
+      document.getElementById("brightnessVal").textContent = val + "%";
+      const effHex = getEffectiveHex();
+      document.getElementById("ledColorInput").value = effHex;
+      updateLiveColorPreview();
+    }
+
+    function updateLiveColorPreview() {
+      const mode = parseInt(document.getElementById("ledModeSelect").value);
+      const target = parseInt(document.getElementById("ledTargetSelect").value);
+      const effHex = getEffectiveHex();
+
+      if (mode !== 0) {
+        if (target === 255) {
+          for (let i = 0; i < 3; i++) updateGlow(i, mode, effHex);
+        } else if (target < 3) {
+          updateGlow(target, mode, effHex);
+        }
+      }
+    }
+
+    function updatePeriodLabel(val) {
+      document.getElementById("periodVal").textContent = (val / 1000).toFixed(1) + "s";
+    }
+
+    async function applyLighting() {
+      const ledIdx = parseInt(document.getElementById("ledTargetSelect").value);
+      const mode = parseInt(document.getElementById("ledModeSelect").value);
+      const period = parseInt(document.getElementById("periodSlider").value);
+
+      const { r, g, b } = getEffectiveRgb();
+      const effHex = getEffectiveHex();
+
+      // Update on-screen glow indicators
+      if (ledIdx === 255) {
+        for (let i = 0; i < 3; i++) updateGlow(i, mode, effHex);
+      } else if (ledIdx < 3) {
+        updateGlow(ledIdx, mode, effHex);
+      }
+
+      if (!hidDevice || !hidDevice.opened) {
+        log(`Lighting updated in preview (${effHex} @ ${currentBrightness}%). Connect device to apply to LEDs.`, "info");
+        return;
+      }
+
+      try {
+        // 15 data bytes for Report ID 0x03
+        const data = new Uint8Array(15);
+        data[0] = ledIdx & 0xFF;
+        data[1] = mode & 0xFF;
+        data[2] = r & 0xFF;
+        data[3] = g & 0xFF;
+        data[4] = b & 0xFF;
+        data[5] = (period >> 8) & 0xFF;
+        data[6] = period & 0xFF;
+
+        await hidDevice.sendReport(REPORT_ID_LED, data);
+        log(`Lighting applied: Mode ${mode}, RGB(${r}, ${g}, ${b}) @ ${currentBrightness}%, Target ${ledIdx === 255 ? 'ALL' : ledIdx + 1}`, "success");
+      } catch (err) {
+        log(`Failed to send lighting command: ${err.message}`, "error");
+      }
+    }
+
+    async function turnOffLeds() {
+      // Clear visual glow for all 3 LEDs
+      for (let i = 0; i < 3; i++) {
+        updateGlow(i, 0, "#000000");
+      }
+
+      if (!hidDevice || !hidDevice.opened) {
+        log("All LEDs turned off in preview. Connect device to apply to hardware.", "info");
+        return;
+      }
+
+      try {
+        const data = new Uint8Array(15);
+        data[0] = 255; // Target: All LEDs
+        data[1] = 0;   // Mode: 0 (Off)
+        await hidDevice.sendReport(REPORT_ID_LED, data);
+        log("Turned off all LEDs on hardware.", "success");
+      } catch (err) {
+        log(`Failed to turn off LEDs: ${err.message}`, "error");
+      }
+    }
+
+    function updateGlow(idx, mode, hex) {
+      const glow = document.getElementById(`glow-${idx}`);
+      if (mode === 0) {
+        glow.style.background = "#000";
+        glow.style.boxShadow = "none";
+      } else {
+        glow.style.background = hex;
+        glow.style.boxShadow = `0 0 16px ${hex}`;
+      }
+    }
+
+    // ===================================================================================
+    // JSON Profiles Export & Import
+    // ===================================================================================
+    function exportKeymapJson() {
+      const exportData = {
+        key1: slotToConfig(0),
+        key2: slotToConfig(1),
+        key3: slotToConfig(2),
+        knob_switch: slotToConfig(3),
+        knob_cw: slotToConfig(4),
+        knob_ccw: slotToConfig(5)
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "keymap.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      log("Exported keymap.json file.", "success");
+    }
+
+    function slotToConfig(idx) {
+      const conf = slotsConfig[idx];
+      if (conf.type === "keyboard") {
+        const mods = [];
+        if (conf.mod & 0x01) mods.push("ctrl");
+        if (conf.mod & 0x02) mods.push("shift");
+        if (conf.mod & 0x04) mods.push("alt");
+        if (conf.mod & 0x08) mods.push("gui");
+        const kObj = KEYCODES.find(k => k.code === conf.key);
+        const kname = kObj ? kObj.name.toLowerCase() : `0x${conf.key.toString(16)}`;
+        return { type: "keyboard", mod: mods, key: kname };
+      } else if (conf.type === "consumer") {
+        const cObj = CONSUMER_CODES.find(c => c.code === conf.code);
+        const cname = cObj ? cObj.name.toLowerCase().replace(/ \/ | /g, "_") : `0x${conf.code.toString(16)}`;
+        return { type: "consumer", action: cname };
+      } else if (conf.type === "macro") {
+        return { type: "macro", keys: (conf.macroStr || "").split(",").map(s => s.trim()) };
+      }
+    }
+
+    function importKeymapJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.key1) parseSlotJson(0, data.key1);
+          if (data.key2) parseSlotJson(1, data.key2);
+          if (data.key3) parseSlotJson(2, data.key3);
+          if (data.knob_switch || data.knob_sw) parseSlotJson(3, data.knob_switch || data.knob_sw);
+          if (data.knob_cw) parseSlotJson(4, data.knob_cw);
+          if (data.knob_ccw) parseSlotJson(5, data.knob_ccw);
+
+          selectSlot(selectedSlot);
+          updateVisuals();
+          log(`Loaded keymap file: '${file.name}'. Click 'Apply All' to send to device.`, "success");
+        } catch (err) {
+          log(`Failed to parse JSON file: ${err.message}`, "error");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    function parseSlotJson(slotIdx, obj) {
+      const type = (obj.type || "keyboard").toLowerCase();
+      if (type === "keyboard") {
+        let mod = 0;
+        const mArr = Array.isArray(obj.mod) ? obj.mod : [obj.mod];
+        mArr.forEach(m => {
+          const ms = String(m).toLowerCase();
+          if (ms.includes("ctrl")) mod |= 0x01;
+          if (ms.includes("shift") || ms === "sh") mod |= 0x02;
+          if (ms.includes("alt")) mod |= 0x04;
+          if (ms.includes("gui") || ms.includes("win")) mod |= 0x08;
+        });
+        const kStr = String(obj.key || "a").toLowerCase();
+        const found = KEYCODES.find(k => k.name.toLowerCase() === kStr) ||
+                      KEYCODES.find(k => k.name.toLowerCase().startsWith(kStr));
+        slotsConfig[slotIdx] = {
+          type: "keyboard",
+          mod: mod,
+          key: found ? found.code : 0x04
+        };
+      } else if (type === "consumer" || type === "media") {
+        const act = String(obj.action || obj.key || "mute").toLowerCase().replace(/_/g, " ");
+        const found = CONSUMER_CODES.find(c => c.name.toLowerCase().includes(act));
+        slotsConfig[slotIdx] = {
+          type: "consumer",
+          code: found ? found.code : 0x00E2
+        };
+      }
+    }
+
+    function loadFactoryDefaults() {
+      slotsConfig = [
+        { type: "keyboard", mod: 0x01, key: 0x06 },
+        { type: "keyboard", mod: 0x01, key: 0x19 },
+        { type: "keyboard", mod: 0x01, key: 0x1D },
+        { type: "consumer", code: 0x00E2 },
+        { type: "consumer", code: 0x00E9 },
+        { type: "consumer", code: 0x00EA }
+      ];
+      selectSlot(0);
+      updateVisuals();
+      log("Reset forms to built-in factory defaults.", "info");
+    }
+  </script>
+</body>
+</html>
