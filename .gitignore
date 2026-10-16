@@ -1,0 +1,14 @@
+testing/
+*.ihx
+*.lk
+*.map
+*.mem
+*.lst
+*.rel
+*.rst
+*.sym
+*.asm
+*.adb
+__pycache__/
+*.pyc
+

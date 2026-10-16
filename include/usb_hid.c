@@ -27,7 +27,9 @@ void HID_init(void) {
 // Send HID report
 void HID_sendReport(__xdata uint8_t* buf, uint8_t len) {
   uint8_t i;
-  while(HID_EP1_writeBusyFlag);                             // wait for ready to write
+  uint16_t timeout = 30000;
+  while(HID_EP1_writeBusyFlag && --timeout);                // wait for ready to write with timeout
+  if(!timeout) return;                                      // return if host not responding
   for(i=0; i<len; i++) EP1_buffer[i] = buf[i];              // copy report to EP1 buffer
   UEP1_T_LEN = len;                                         // set length to upload
   HID_EP1_writeBusyFlag = 1;                                // set busy flag

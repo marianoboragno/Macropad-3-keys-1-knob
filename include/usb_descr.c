@@ -73,7 +73,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
     .bEndpointAddress   = USB_ENDP_ADDR_EP1_IN,   // endpoint: 1, direction: IN (0x01)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP1_SIZE,               // max packet size
-    .bInterval          = 10                      // polling intervall in ms
+    .bInterval          = 1                       // polling intervall in ms (1ms = 1000Hz)
   },
 
   // Endpoint Descriptor: Endpoint 2 (OUT, Interrupt)
@@ -83,7 +83,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
     .bEndpointAddress   = USB_ENDP_ADDR_EP2_OUT,  // endpoint: 1, direction: IN (0x82)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP2_SIZE,               // max packet size
-    .bInterval          = 10                      // polling intervall in ms
+    .bInterval          = 1                       // polling intervall in ms
   }
 };
 

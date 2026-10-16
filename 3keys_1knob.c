@@ -134,6 +134,7 @@ __xdata struct key
   uint16_t codeConsumer[2]; // code of the key (only used in Consumer type) (was getting an error when using an array)
   uint8_t last;             // last state of the key
   uint8_t toggle;           // toggle for the key
+  uint8_t debounce;         // debounce lockout counter
 };
 
 // ===================================================================================
@@ -144,9 +145,9 @@ __xdata struct key
 void NEO_update(uint8_t *neo)
 {
   EA = 0;                       // disable interrupts
-  NEO_writeColor(0, neo[0], 0); // NeoPixel 1 lights up red
+  NEO_writeColor(neo[0], 0, 0); // NeoPixel 1 lights up red
   NEO_writeColor(0, neo[1], 0); // NeoPixel 2 lights up green
-  NEO_writeColor(0, neo[2], 0); // NeoPixel 3 lights up blue
+  NEO_writeColor(0, 0, neo[2]); // NeoPixel 3 lights up blue
   EA = 1;                       // enable interrupts
 }
 
@@ -163,9 +164,14 @@ uint8_t eeprom_read_byte(uint8_t addr)
 // handle key press
 void handle_key(uint8_t current, struct key *key, uint8_t *neo)
 {
-  if (current != key->last)
+  if (key->debounce)
+  {
+    key->debounce--;
+  }
+  else if (current != key->last)
   {                      // state changed?
     key->last = current; // update last state flag
+    key->debounce = 15;  // 15ms lockout for mechanical bounce
     if (current)
     { // key was pressed?
       if (key->type == KEYBOARD)
@@ -248,6 +254,38 @@ void handle_key(uint8_t current, struct key *key, uint8_t *neo)
   }
 }
 
+// ===================================================================================
+// Rotary Encoder Full-Step State Machine (Ben Buxton / buxtronix)
+// ===================================================================================
+#define DIR_NONE      0x0
+#define DIR_CW        0x10
+#define DIR_CCW       0x20
+
+#define R_START       0x0
+#define R_CW_FINAL    0x1
+#define R_CW_BEGIN    0x2
+#define R_CW_NEXT     0x3
+#define R_CCW_BEGIN   0x4
+#define R_CCW_FINAL   0x5
+#define R_CCW_NEXT    0x6
+
+__code const uint8_t ttable[7][4] = {
+  // R_START (0x0)
+  {R_START,    R_CW_BEGIN,  R_CCW_BEGIN,  R_START},
+  // R_CW_FINAL (0x1)
+  {R_CW_NEXT,  R_START,     R_CW_FINAL,   R_START | DIR_CW},
+  // R_CW_BEGIN (0x2)
+  {R_CW_NEXT,  R_CW_BEGIN,  R_START,      R_START},
+  // R_CW_NEXT (0x3)
+  {R_CW_NEXT,  R_CW_BEGIN,  R_CW_FINAL,   R_START},
+  // R_CCW_BEGIN (0x4)
+  {R_CCW_NEXT, R_START,     R_CCW_BEGIN,  R_START},
+  // R_CCW_FINAL (0x5)
+  {R_CCW_NEXT, R_CCW_FINAL, R_START,      R_START | DIR_CCW},
+  // R_CCW_NEXT (0x6)
+  {R_CCW_NEXT, R_CCW_FINAL, R_CCW_BEGIN,  R_START},
+};
+
 // handle knob
 void handle_knob(struct key *key)
 {
@@ -289,7 +327,6 @@ void handle_knob(struct key *key)
       DLY_ms(5);
     }
   }
-  DLY_ms(10);
 }
 
 // ===================================================================================
@@ -301,8 +338,10 @@ void main(void)
   __xdata struct key keys[6]; // array of struct for keys
   __idata uint8_t i;
   __idata uint8_t j; // temp variable
-  uint8_t neo[6] =
-      {0, NEO_MAX, 0}; // brightness of NeoPixels
+  uint8_t enc_state = R_START;
+  uint8_t pin_state;
+  uint8_t fade_div = 0;
+  uint8_t neo[6] = {0, 0, 0, 0, 0, 0}; // brightness of NeoPixels
 
   // Enter bootloader if key 1 is pressed
   NEO_init(); // init NeoPixels
@@ -320,10 +359,10 @@ void main(void)
   KBD_init();   // init USB HID keyboard
   WDT_start();  // start watchdog timer
 
-  // TODO: Read eeprom for key characters
-  // it sohuld read each row of 12 bytes and assign them to the key struct
+  // Read eeprom for key characters
   for (i = 0; i < 6; i++)
   {
+    keys[i].debounce = 0;
     if (eeprom_read_byte(index) == 0)
     {
       keys[i].type = KEYBOARD;
@@ -355,6 +394,8 @@ void main(void)
     index += incremental;
   }
 
+  NEO_update(neo); // ensure LEDs are turned off initially
+
   // Loop
   while (1)
   {
@@ -363,28 +404,31 @@ void main(void)
     handle_key(!PIN_read(PIN_KEY3), &keys[2], &neo[2]);
     handle_key(!PIN_read(PIN_ENC_SW), &keys[3], (void *)0);
 
-    if (!PIN_read(PIN_ENC_A))
-    { // encoder turned ?
-      if (PIN_read(PIN_ENC_B))
-      {
-        handle_knob(&keys[4]); // clockwise?
-      }
-      else
-      {
-        handle_knob(&keys[5]); // counter-clockwise?
-      }
-      while (!PIN_read(PIN_ENC_A))
-        ; // wait until next detent
+    // Rotary encoder state machine
+    pin_state = (PIN_read(PIN_ENC_A) << 1) | PIN_read(PIN_ENC_B);
+    enc_state = ttable[enc_state & 0x0F][pin_state];
+    if ((enc_state & 0x30) == DIR_CW)
+    {
+      handle_knob(&keys[4]); // clockwise
+    }
+    else if ((enc_state & 0x30) == DIR_CCW)
+    {
+      handle_knob(&keys[5]); // counter-clockwise
     }
 
-    // Update NeoPixels
-    NEO_update(neo);
-    for (i = 0; i < 3; i++)
+    // Update NeoPixels and fade down every 4ms
+    if (++fade_div >= 4)
     {
-      if (neo[i] > NEO_GLOW)
-        neo[i]--; // fade down NeoPixel
+      fade_div = 0;
+      NEO_update(neo);
+      for (i = 0; i < 3; i++)
+      {
+        if (neo[i] > NEO_GLOW)
+          neo[i]--; // fade down NeoPixel
+      }
     }
-    DLY_ms(5);   // latch and debounce
+
+    DLY_ms(1);   // 1kHz sampling rate
     WDT_reset(); // reset watchdog
   }
 }
