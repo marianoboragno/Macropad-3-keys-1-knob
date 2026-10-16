@@ -24,7 +24,7 @@ flowchart LR
         FSM["Autonomous Animation Engine"]
         WS2812["3x NeoPixels (WS2812B)"]
     end
-    EP1 -->|"Report ID 1: Keyboard\nReport ID 2: Consumer"| Host
+    EP1 -->|"Report ID 1: Keyboard<br>Report ID 2: Consumer"| Host
     Host -->|"Report ID 3: Vendor LED Control"| EP2
     EP2 --> FSM
     FSM --> WS2812

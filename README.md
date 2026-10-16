@@ -20,17 +20,20 @@ The MacroPad operates as a composite USB HID input device, acting simultaneously
 ```mermaid
 flowchart TD
     subgraph Hardware ["MacroPad Mini"]
-        MCU["MCU WCH CH552G\n(8051 @ 16MHz, USB Full-Speed)"]
+        MCU["MCU WCH CH552G<br>(8051 @ 16MHz, USB Full-Speed)"]
         SW1["Key 1 (Cherry MX)"] -->|P1.1| MCU
         SW2["Key 2 (Cherry MX)"] -->|P1.7| MCU
         SW3["Key 3 (Cherry MX)"] -->|P1.6| MCU
         ENC_SW["Knob Switch"] -->|P3.3| MCU
         ENC_A["Encoder Out A"] -->|P3.1| MCU
         ENC_B["Encoder Out B"] -->|P3.0| MCU
-        MCU -->|P3.4| NEO["3x WS2812B LEDs\n(Daisy-Chain)"]
-        MCU <-->|D+ (P3.6) / D- (P3.7)| USB["USB Type-C Connector"]
+        MCU -->|P3.4| NEO["3x WS2812B LEDs<br>(Daisy-Chain)"]
+        
+        USB["USB Type-C Connector"]
+        MCU --- |"D+ (P3.6) / D- (P3.7)"| USB
     end
-    USB <--> Host["Host PC (Linux / Win / Mac)"]
+    
+    USB --- Host["Host PC (Linux / Win / Mac)"]
 ```
 
 1. **Microcontroller (MCU): WCH CH552G**
@@ -69,73 +72,91 @@ flowchart TD
 
 ## 2. Entering Bootloader Mode
 
-The CH552 includes a factory ROM bootloader that enables flashing firmware directly over USB without external hardware programmers.
+The CH552 includes a factory ROM bootloader that enables flashing firmware directly over USB without external hardware programmers (`VID:PID = 4348:55e0`).
+
+> [!IMPORTANT]
+> **First-Time Flashing from Factory Stock Firmware:**
+> Off-the-shelf commercial macropads ship from the factory with closed-source proprietary firmware that does **NOT** support software bootloader triggers.
+> - **Initial Flash:** You **MUST** use **Method B (1 kΩ hardware pull-up)** at least once to flash this open-source firmware onto a new device.
+> - **Subsequent Flashes:** Once this firmware is installed on the device, you can close the case permanently and use **Method A (holding Key 1)** for all future updates.
 
 ```
-       ┌───────────────────────┐
-       │    BOOTLOADER MODE    │
-       │  VID:PID = 4348:55e0  │
-       └───────────┬───────────┘
-                   │
-       ┌───────────┴───────────┐
-       ▼                       ▼
- [Method A - Software]     [Method B - Hardware]
- Hold KEY 1 while          1kΩ resistor between
- plugging in USB           P3.6 (D+) and 5V (VBUS)
- (Running this firmware)   (Blank / unprogrammed chip)
+       ┌────────────────────────────────────────────────────────┐
+       │                BOOTLOADER MODE (4348:55e0)             │
+       └───────────┬────────────────────────────────┬───────────┘
+                   │                                │
+                   ▼                                ▼
+       [FIRST-TIME FLASH / RECOVERY]       [SUBSEQUENT FLASHES]
+           Method B (Hardware)              Method A (Software)
+        1kΩ resistor between D+ and 5V      Hold KEY 1 while plugging USB
+        (Stock factory or bricked MCU)      (Running this open-source FW)
 ```
 
-### Method A: Software Trigger (Recommended)
-1. Unplug the USB cable from the MacroPad.
-2. Press and hold **KEY 1** (the leftmost mechanical key).
-3. Plug the USB cable back into your computer and release the key.
-4. The firmware detects the held key at startup, briefly lights the LEDs white, and transfers execution to the ROM bootloader (`BOOT_now()`).
-5. Running `lsusb` will show:
+### Method B: Hardware Pull-up (MANDATORY for First Flash / Recovery)
+This method forces the microcontroller's unalterable internal factory ROM into bootloader mode at power-on:
+1. **Unscrew the bottom plate** of the macropad to access the underside of the PCB.
+2. The WCH bootloader checks at power-on whether line `D+` (`P3.6`) is pulled high.
+3. With the board disconnected from USB, temporarily hold a **1 kΩ resistor between pin P3.6 (D+) and 5V (VBUS / VCC)** (or across the boot pads on boards equipped with them).
+4. Plug in the USB cable to your computer.
+5. Within the 3-second countdown provided by the flasher, remove the resistor.
+6. Verify detection with `lsusb`:
    ```text
    ID 4348:55e0 WinChipHead
    ```
 
-### Method B: Hardware Pull-up via 1kΩ Resistor (For blank or bricked chips)
-If the MCU is unprogrammed, has corrupted firmware, or runs a third-party firmware that does not support key triggers:
-1. The WCH bootloader checks at power-on if line `D+` (`P3.6`) is pulled high.
-2. With the board disconnected, temporarily place a **1 kΩ resistor (or jumper wire on boards with a BOOT button) between pin P3.6 (D+) and 5V (VCC / VBUS)**.
-3. Plug in the USB cable. Once the host detects the device in bootloader mode (`4348:55e0`), remove the resistor.
+### Method A: Software Trigger (For Subsequent Flashes)
+Once this custom firmware has been flashed to the device, hardware access is no longer required:
+1. Unplug the USB cable from the MacroPad.
+2. Press and hold **KEY 1** (the leftmost mechanical key).
+3. Plug the USB cable back into your computer and release the key.
+4. The firmware detects the held key at startup, briefly flashes the LEDs white, and transfers execution to the ROM bootloader (`BOOT_now()`).
+5. Running `lsusb` will confirm bootloader mode (`4348:55e0`).
 
 ---
 
-## 3. Building and Flashing
+## 3. Building, Setup, and Flashing
 
-### 3.1. Toolchain & Dependencies Requirements
+### 3.1. Toolchain & Python Environment
 - **Compiler:** `sdcc` (Small Device C Compiler)
-- **Python Dependencies:** `pyusb`, `ch55xtool`, `evdev`
+- **Python Tools:** `pyusb`, `ch55xtool`, `evdev`
 
-Install compiler on Arch Linux:
+#### 1. Install SDCC Compiler
+On Arch Linux:
 ```bash
 sudo pacman -S sdcc
 ```
-Install compiler on Debian / Ubuntu:
+On Debian / Ubuntu:
 ```bash
 sudo apt install sdcc
 ```
 
-Install Python tools dependencies:
+#### 2. Create Python Virtual Environment & Install Dependencies
+Create an isolated environment and install the required tools:
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r tools/requirements.txt
 ```
 
-### 3.2. Compiling Firmware
+### 3.2. Linux udev Rules (Non-Root USB Access)
+Install the provided udev rule to grant non-root permissions for **both firmware flashing and runtime RGB LED control**:
+```bash
+sudo cp tools/udev/99-macropad.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### 3.3. Compiling Firmware
 ```bash
 make bin
 ```
-This generates the binary file `3keys_1knob.bin`.
+This compiles the C source code and generates the binary file `3keys_1knob.bin`.
 
-### 3.3. Flashing Firmware (Code Flash)
-With the MacroPad in Bootloader mode (Method A or B):
+### 3.4. Flashing Firmware & Default Keymap
+Put the MacroPad in Bootloader mode (**Method B** for a new factory board, or **Method A** if already running this firmware) and run:
 ```bash
-make flash
-# or manually:
-sudo python3 tools/flash.py 3keys_1knob.bin
+python tools/flash.py
 ```
+*(No `sudo` required once the udev rule is installed).*
 
 ---
 
@@ -334,41 +355,43 @@ The unified flasher [`tools/flash.py`](tools/flash.py) manages both firmware and
   python tools/dump_eeprom.py eeprom_backup.bin
   ```
 
+### 4.5. Live Input Diagnostics (`test_macropad.py`)
+To monitor physical keystrokes, rotary encoder steps, and knob button clicks in real time:
+```bash
+sudo $(which python) tools/test_macropad.py
+```
+*(Requires `sudo` to inspect low-level Linux kernel `/dev/input/event*` devices. To exit the diagnostic monitor, press `Ctrl+C` 3 times rapidly to avoid accidental termination when testing Key 1).*
+
 ---
 
 ## 5. Host-Controlled RGB Lighting
 
 The firmware provides an autonomous USB HID lighting subsystem. **The host issues a single command, and the microcontroller handles rendering and timing independently.**
 
-### 5.1. udev Rule (Access without root)
-Install the udev rule to allow non-root users to control the LEDs:
-```bash
-sudo cp tools/udev/99-macropad.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-```
+*(Ensure the udev rule from [Section 3.2](#32-linux-udev-rules-non-root-usb-access) is installed to run without `sudo`).*
 
-### 5.2. Using the CLI Tool (`macropad_led.py`)
+### 5.1. Using the CLI Tool (`macropad_led.py`)
 ```bash
 # 1. Set LED 1 to solid green
-python3 tools/macropad_led.py 1 --solid green
+python tools/macropad_led.py 1 --solid green
 
 # 2. Set LED 2 to smooth blue breathing with a 4-second period
-python3 tools/macropad_led.py 2 --breathe 4s "#0022FA"
+python tools/macropad_led.py 2 --breathe 4s "#0022FA"
 
 # 3. Set LED 3 blinking red every 1 second
-python3 tools/macropad_led.py 3 --blink 1s red
+python tools/macropad_led.py 3 --blink 1s red
 
 # 4. Synchronize all 3 LEDs breathing purple together (100% in phase)
-python3 tools/macropad_led.py all --breathe 3s purple
+python tools/macropad_led.py all --breathe 3s purple
 
 # 5. Restore reactive mode on physical key presses
-python3 tools/macropad_led.py all --reactive
+python tools/macropad_led.py all --reactive
 
 # 6. Turn off all LEDs
-python3 tools/macropad_led.py all --off
+python tools/macropad_led.py all --off
 ```
 
-### 5.3. Developer Interface Specification (ICD)
+### 5.2. Developer Interface Specification (ICD)
 For developers building custom host applications, daemons, or system integrations in Python, C, Go, or Rust, consult the complete specification:
 👉 **[View Interface Control Document (ICD.md)](ICD.md)**
 
